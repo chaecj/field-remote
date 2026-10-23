@@ -48,6 +48,7 @@ public final class HidKeyboard {
     private BluetoothHidDevice hid;
     private BluetoothDevice host;
     private boolean registered;
+    private boolean registering;
     private boolean wanted;
     private String state = "off";
 
@@ -65,27 +66,33 @@ public final class HidKeyboard {
     void start() {
         wanted = true;
         if (adapter == null || !adapter.isEnabled()) { setState("off"); return; }
-        if (hid != null) { if (!registered) register(); else emitState(); return; }
+        if (hid != null) { if (!registered && !registering) register(); else emitState(); return; }
         boolean ok = adapter.getProfileProxy(ctx, new BluetoothProfile.ServiceListener() {
             @Override public void onServiceConnected(int profile, BluetoothProfile proxy) {
                 hid = (BluetoothHidDevice) proxy;
                 if (wanted) register();
             }
             @Override public void onServiceDisconnected(int profile) {
-                hid = null; registered = false; host = null; setState("off");
+                hid = null; registered = false; registering = false; host = null; setState("off");
             }
         }, BluetoothProfile.HID_DEVICE);
         if (!ok) setState("unsupported");
     }
 
     private void register() {
-        if (hid == null) return;
+        if (hid == null || registered || registering) return;
         BluetoothHidDeviceAppSdpSettings sdp = new BluetoothHidDeviceAppSdpSettings(
             "현장 리모컨", "Keyboard and mouse", "CHAEUM", BluetoothHidDevice.SUBCLASS1_COMBO, DESCRIPTOR);
+        registering = true;
         try {
             boolean ok = hid.registerApp(sdp, null, null, ex, cb);
-            if (!ok) setState("unsupported");
-        } catch (Exception e) { setState("unsupported"); }
+            if (!ok) {
+                // 이전 등록이 남아 있으면 실패할 수 있어서, 한 번 풀고 다시 등록
+                try { hid.unregisterApp(); } catch (Exception ignored) {}
+                ok = hid.registerApp(sdp, null, null, ex, cb);
+            }
+            if (!ok) { registering = false; setState("failed"); }
+        } catch (Exception e) { registering = false; setState("failed"); }
     }
 
     void stop() {
@@ -97,7 +104,7 @@ public final class HidKeyboard {
                 adapter.closeProfileProxy(BluetoothProfile.HID_DEVICE, hid);
             }
         } catch (Exception ignored) {}
-        hid = null; host = null; registered = false;
+        hid = null; host = null; registered = false; registering = false;
         setState("off");
     }
 
@@ -132,6 +139,7 @@ public final class HidKeyboard {
     private final BluetoothHidDevice.Callback cb = new BluetoothHidDevice.Callback() {
         @Override public void onAppStatusChanged(BluetoothDevice device, boolean reg) {
             registered = reg;
+            registering = false;
             if (!reg) { host = null; setState(wanted ? "off" : "off"); return; }
             setState(host != null ? "on" : "ready");
             // 예전에 연결했던 기기가 있으면 다시 연결 시도

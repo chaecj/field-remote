@@ -1249,6 +1249,7 @@ window.__native = {
     d.host = host || ''; d.bt = state === 'on' ? 1 : 0;
     ui.render();
     if (state === 'unsupported') ui.toast('이 휴대폰은 블루투스 키보드 모드를 지원하지 않아요.');
+    if (state === 'failed') ui.toast('키보드 모드를 켜지 못했어요. 다른 블루투스 키보드 앱을 쓰고 있다면 끄고 ‘다시 시도’를 눌러 주세요.');
   },
   onVolumeKey(dir) { if (window.__clk) window.__clk.count(dir); },
   onPerm(ok) { if (!ok) ui.toast('블루투스 권한을 허용해야 동글을 찾고 연결할 수 있어요.'); },
