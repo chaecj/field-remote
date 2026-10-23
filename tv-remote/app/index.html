@@ -936,7 +936,13 @@ const ui = {
       <div class="card"><button class="btn danger" id="hidOff">키보드 모드 끄기</button></div>`;
     $('#hidDisc').onclick = () => Native.hidDiscoverable();
     const hr = $('#hidRetry'); if (hr) hr.onclick = () => { d.connect(); this.toast('다시 켜는 중…'); };
-    $$('[data-hc]', body).forEach(b => b.onclick = () => { Native.hidConnect(bonded[+b.dataset.hc].addr); this.toast('연결하는 중'); });
+    $$('[data-hc]', body).forEach(b => b.onclick = () => {
+      const target = bonded[+b.dataset.hc];
+      Native.hidConnect(target.addr); this.toast('연결하는 중…');
+      setTimeout(() => {
+        if (d.state !== 'on') this.toast(`‘${target.name || target.addr}’이(가) 키보드 연결을 받지 않았어요. 이 기기는 동글로 연결해 주세요.`);
+      }, 10000);
+    });
     $('#hidOff').onclick = () => {
       Native.hidStop(); store.phoneKb = false; save();
       dongles.delete(d.id); selected.delete(d.id);

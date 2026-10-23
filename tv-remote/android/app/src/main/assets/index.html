@@ -916,6 +916,7 @@ const ui = {
       <div class="card">
         <div class="row"><span class="dot ${d.state}"></span><h2 class="grow">이 휴대폰 (블루투스 키보드)</h2></div>
         <dl class="kv"><dt>상태</dt><dd>${st}</dd></dl>
+        ${d.state === 'offline' ? '<button class="btn" id="hidRetry">다시 시도</button>' : ''}
         <p>동글 없이 휴대폰이 직접 블루투스 키보드·마우스가 됩니다. 블루투스 키보드를 받는 전자칠판·노트북·태블릿에서 쓸 수 있어요. IR(TV 리모컨 신호)은 보낼 수 없어요.</p>
       </div>
       <div class="card">
@@ -934,7 +935,14 @@ const ui = {
       </div>
       <div class="card"><button class="btn danger" id="hidOff">키보드 모드 끄기</button></div>`;
     $('#hidDisc').onclick = () => Native.hidDiscoverable();
-    $$('[data-hc]', body).forEach(b => b.onclick = () => { Native.hidConnect(bonded[+b.dataset.hc].addr); this.toast('연결하는 중'); });
+    const hr = $('#hidRetry'); if (hr) hr.onclick = () => { d.connect(); this.toast('다시 켜는 중…'); };
+    $$('[data-hc]', body).forEach(b => b.onclick = () => {
+      const target = bonded[+b.dataset.hc];
+      Native.hidConnect(target.addr); this.toast('연결하는 중…');
+      setTimeout(() => {
+        if (d.state !== 'on') this.toast(`‘${target.name || target.addr}’이(가) 키보드 연결을 받지 않았어요. 이 기기는 동글로 연결해 주세요.`);
+      }, 10000);
+    });
     $('#hidOff').onclick = () => {
       Native.hidStop(); store.phoneKb = false; save();
       dongles.delete(d.id); selected.delete(d.id);
@@ -1198,6 +1206,12 @@ function addPhoneKb() {
   const c = cfgOf(d.id); if (!c.name) c.name = '이 휴대폰 (키보드)'; c.mode = 'usb';
   store.phoneKb = true; save();
   current = d.id; switchTab('set'); d.connect(); ui.render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  ui.toast('휴대폰 키보드 모드를 켜는 중…');
+  setTimeout(() => {
+    if (d.state === 'offline') ui.toast('키보드 모드를 켜지 못했어요. 블루투스를 켜고 ‘다시 시도’를 눌러 주세요.');
+    else if (d.state === 'wait') ui.toast('키보드 준비 완료. 이제 ‘이 휴대폰 찾기 허용’을 누르세요.');
+  }, 4000);
 }
 function restoreNative() {
   for (const [id, c] of Object.entries(store.tvs)) {
