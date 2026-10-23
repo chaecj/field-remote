@@ -3,6 +3,11 @@ name: 안드로이드 앱 빌드
 on:
   push:
     branches: [main]
+    # 앱에 들어가는 파일이 바뀔 때만 새로 빌드 (README·펌웨어만 고칠 때는 건너뜀)
+    paths:
+      - 'tv-remote/android/**'
+      - 'tv-remote/app/index.html'
+      - '.github/workflows/android.yml'
   workflow_dispatch:
 
 permissions:
