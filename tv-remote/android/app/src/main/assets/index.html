@@ -231,6 +231,7 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
   background: var(--fg); color: var(--bg); border-radius: 10px; padding: 9px 14px; font-size: 13.5px; z-index: 30;
   max-width: calc(100% - 32px); box-shadow: 0 6px 24px rgb(0 0 0 / 0.35);
 }
+.hidlog { margin: 0; font: 11.5px/1.5 var(--font-mono); color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
 .log { font: 11.5px var(--font-mono); color: var(--muted); min-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
@@ -933,6 +934,11 @@ const ui = {
         <p>한 번 페어링한 기기는 여기서 바로 연결해요.</p>
         <div class="grid">${bonded.length ? bonded.map((b, i) => `<div class="macro"><div class="nm">${esc(b.name || b.addr)}<small>${esc(b.addr)}</small></div><button class="btn sm primary" data-hc="${i}">연결</button></div>`).join('') : '<div class="empty">페어링된 기기가 없어요.</div>'}</div>
       </div>
+      <div class="card">
+        <h2>진행 기록</h2>
+        <p>문제가 생기면 이 화면을 캡처해서 보내 주세요.</p>
+        <pre class="hidlog">${esc((d.logs || ['기록 없음']).join('\n'))}</pre>
+      </div>
       <div class="card"><button class="btn danger" id="hidOff">키보드 모드 끄기</button></div>`;
     $('#hidDisc').onclick = () => Native.hidDiscoverable();
     const hr = $('#hidRetry'); if (hr) hr.onclick = () => { d.connect(); this.toast('다시 켜는 중…'); };
@@ -1250,6 +1256,12 @@ window.__native = {
     ui.render();
     if (state === 'unsupported') ui.toast('이 휴대폰은 블루투스 키보드 모드를 지원하지 않아요.');
     if (state === 'failed') ui.toast('키보드 모드를 켜지 못했어요. 다른 블루투스 키보드 앱을 쓰고 있다면 끄고 ‘다시 시도’를 눌러 주세요.');
+  },
+  onHidLog(msg) {
+    const d = dongles.get('phone-kb'); if (!d) return;
+    const t = new Date().toTimeString().slice(0, 8);
+    d.logs = (d.logs || []).concat(t + '  ' + msg).slice(-12);
+    if (current === d.id) ui.renderSettings();
   },
   onVolumeKey(dir) { if (window.__clk) window.__clk.count(dir); },
   onPerm(ok) { if (!ok) ui.toast('블루투스 권한을 허용해야 동글을 찾고 연결할 수 있어요.'); },
