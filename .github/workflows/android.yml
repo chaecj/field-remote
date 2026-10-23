@@ -1,0 +1,45 @@
+name: 안드로이드 앱 빌드
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: 최신 화면 파일 복사
+        run: cp tv-remote/app/index.html tv-remote/android/app/src/main/assets/index.html
+
+      - name: APK 빌드
+        working-directory: tv-remote/android
+        run: gradle assembleRelease --no-daemon
+
+      - name: 파일 이름 정리
+        run: cp tv-remote/android/app/build/outputs/apk/release/app-release.apk field-remote.apk
+
+      - name: Releases에 올리기
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: 현장 리모컨 ${{ github.run_number }}
+          body: 휴대폰에서 field-remote.apk 를 눌러 내려받아 설치하세요.
+          files: field-remote.apk
+          make_latest: true
