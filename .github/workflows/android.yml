@@ -42,7 +42,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: 현장 리모컨 ${{ github.run_number }}
+          name: HW 리모컨 ${{ github.run_number }}
           body: 휴대폰에서 field-remote.apk 를 눌러 내려받아 설치하세요.
           files: field-remote.apk
           make_latest: true

@@ -96,7 +96,7 @@ public final class HidKeyboard {
     private void register() {
         if (hid == null || registered || registering) return;
         BluetoothHidDeviceAppSdpSettings sdp = new BluetoothHidDeviceAppSdpSettings(
-            "현장 리모컨", "Keyboard and mouse", "CHAEUM", BluetoothHidDevice.SUBCLASS1_COMBO, DESCRIPTOR);
+            "HW 리모컨", "Keyboard and mouse", "CHAEUM", BluetoothHidDevice.SUBCLASS1_COMBO, DESCRIPTOR);
         registering = true;
         try {
             boolean ok = hid.registerApp(sdp, null, null, ex, cb);

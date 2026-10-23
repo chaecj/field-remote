@@ -76,7 +76,7 @@ public class RemoteService extends Service {
         PendingIntent pi = PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         Notification.Builder b = new Notification.Builder(this, CH);
         return b.setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
-            .setContentTitle("현장 리모컨")
+            .setContentTitle("HW 리모컨")
             .setContentText(wantVolume ? "연결 유지 중 · 볼륨 버튼으로 넘기기 켬" : "동글 연결 유지 중")
             .setContentIntent(pi)
             .setOngoing(true)

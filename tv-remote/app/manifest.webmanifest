@@ -1,6 +1,6 @@
 {
-  "name": "현장 리모컨",
-  "short_name": "현장 리모컨",
+  "name": "HW 리모컨",
+  "short_name": "HW 리모컨",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
