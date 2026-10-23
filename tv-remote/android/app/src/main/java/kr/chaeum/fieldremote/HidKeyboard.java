@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothHidDevice;
+import android.bluetooth.BluetoothHidDeviceAppQosSettings;
 import android.bluetooth.BluetoothHidDeviceAppSdpSettings;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
@@ -49,6 +50,7 @@ public final class HidKeyboard {
     private BluetoothDevice host;
     private boolean registered;
     private boolean registering;
+    private int attempt;
     private boolean wanted;
     private String state = "off";
 
@@ -71,7 +73,7 @@ public final class HidKeyboard {
         if (!adapter.isEnabled()) { log("블루투스가 꺼져 있음"); setState("off"); return; }
         if (hid != null) {
             log("이미 준비된 상태 (등록 " + registered + ", 등록 중 " + registering + ")");
-            if (!registered && !registering) register(); else emitState();
+            if (!registered && !registering) { attempt = 0; register(); } else emitState();
             return;
         }
         boolean ok;
@@ -80,7 +82,8 @@ public final class HidKeyboard {
                 @Override public void onServiceConnected(int profile, BluetoothProfile proxy) {
                     log("키보드 기능 연결됨");
                     hid = (BluetoothHidDevice) proxy;
-                    if (wanted) register();
+                    attempt = 0;
+                    if (wanted) Hub.main.postDelayed(() -> register(), 300);
                 }
                 @Override public void onServiceDisconnected(int profile) {
                     log("키보드 기능 끊김");
@@ -95,20 +98,35 @@ public final class HidKeyboard {
 
     private void register() {
         if (hid == null || registered || registering) return;
+        attempt++;
         BluetoothHidDeviceAppSdpSettings sdp = new BluetoothHidDeviceAppSdpSettings(
             "HW 리모컨", "Keyboard and mouse", "CHAEUM", BluetoothHidDevice.SUBCLASS1_COMBO, DESCRIPTOR);
+        // 휴대폰마다 받아들이는 방식이 달라서 시도할 때마다 조합을 바꿈
+        BluetoothHidDeviceAppQosSettings qos = attempt % 2 == 1
+            ? new BluetoothHidDeviceAppQosSettings(BluetoothHidDeviceAppQosSettings.SERVICE_BEST_EFFORT, 800, 9, 0, 11250, BluetoothHidDeviceAppQosSettings.MAX)
+            : null;
+        java.util.concurrent.Executor exec = attempt <= 2 ? ctx.getMainExecutor() : ex;
         registering = true;
         try {
-            boolean ok = hid.registerApp(sdp, null, null, ex, cb);
-            log("키보드 등록 요청: " + ok);
+            boolean ok = hid.registerApp(sdp, null, qos, exec, cb);
+            log("키보드 등록 요청 " + attempt + "차 (" + (qos != null ? "QoS" : "기본") + "): " + ok);
             if (!ok) {
-                // 이전 등록이 남아 있으면 실패할 수 있어서, 한 번 풀고 다시 등록
-                try { log("등록 해제 후 재시도: " + hid.unregisterApp()); } catch (Exception e) { log("해제 오류: " + e); }
-                ok = hid.registerApp(sdp, null, null, ex, cb);
+                try { log("등록 해제: " + hid.unregisterApp()); } catch (Exception e) { log("해제 오류: " + e); }
+                ok = hid.registerApp(sdp, null, qos, exec, cb);
                 log("키보드 등록 재요청: " + ok);
             }
-            if (!ok) { registering = false; setState("failed"); }
-            else Hub.main.postDelayed(() -> { if (registering) log("5초 동안 등록 결과 없음"); }, 5000);
+            if (!ok) { registering = false; setState("failed"); return; }
+            final int my = attempt;
+            Hub.main.postDelayed(() -> {
+                if (!registering || attempt != my) return;
+                log("5초 동안 등록 결과 없음");
+                registering = false;
+                if (attempt < 4 && wanted) {
+                    try { hid.unregisterApp(); } catch (Exception ignored) {}
+                    log("방식을 바꿔 다시 등록");
+                    Hub.main.postDelayed(() -> register(), 800);
+                } else setState("failed");
+            }, 5000);
         } catch (Exception e) { log("등록 오류: " + e); registering = false; setState("failed"); }
     }
 
