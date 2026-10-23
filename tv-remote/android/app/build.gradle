@@ -1,0 +1,46 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'kr.chaeum.fieldremote'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'kr.chaeum.fieldremote'
+        minSdk 28
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+    }
+
+    // 항상 같은 서명키로 빌드해서, 새 버전을 설치해도 저장된 TV·매크로가 지워지지 않게 함
+    signingConfigs {
+        fixed {
+            storeFile file('fieldremote.keystore')
+            storePassword 'fieldremote'
+            keyAlias 'fieldremote'
+            keyPassword 'fieldremote'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.fixed
+        }
+        release {
+            signingConfig signingConfigs.fixed
+            minifyEnabled false
+        }
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
