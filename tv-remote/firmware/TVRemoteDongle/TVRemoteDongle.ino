@@ -43,13 +43,21 @@
 extern "C" bool tud_mounted(void);
 extern "C" bool tud_suspended(void);
 extern "C" int ble_store_clear(void);
+#include "esp_system.h"
+
+// ---------------- 진단: 어디서 멈췄는지 기록 (재시작해도 남는 메모리) ----------------
+RTC_NOINIT_ATTR uint32_t rtcMagic, rtcStage, rtcCrashes;
+static const uint32_t RTC_MAGIC = 0x48575243;
+static inline void stage(uint8_t s) { rtcStage = s; }
+String diag;        // 휴대폰 앱에 보여 줄 진단 문구
+bool noHid = false; // 안전 모드: 블루투스 키보드 기능 끔
 
 // ---------------- 하드웨어 ----------------
 static const int PIN_IR  = 4;   // 내장 IR LED
 static const int PIN_LED = 35;  // RGB LED (WS2812)
 static const int PIN_BTN = 41;  // 윗면 버튼
 
-static const char *FW_VERSION = "1.1.0";
+static const char *FW_VERSION = "1.1.1";
 
 // ---------------- BLE UUID ----------------
 #define SVC_UUID  "7e1a0001-5c2b-4f3a-9e7d-3c1b8a9f0a11"
@@ -130,7 +138,8 @@ void publishInfo() {
   if (!infoChar) return;
   String j = "{\"n\":\"" + devName + "\",\"v\":\"" + FW_VERSION + "\",\"usb\":" +
              (usbReady() ? "true" : "false") + ",\"bt\":" + String(btHostCount()) +
-             ",\"mtu\":" + String(peerMtu) + ",\"btn\":" + String(btnCount) + "}";
+             ",\"mtu\":" + String(peerMtu) + ",\"btn\":" + String(btnCount) +
+             ",\"d\":\"" + diag + "\"}";
   infoChar->setValue(j.c_str());
   if (phoneConnected()) infoChar->notify();
 }
@@ -401,26 +410,62 @@ void handle(const Msg &m) {
 }
 
 // ---------------- setup / loop ----------------
+// 재시작 원인을 LED로 알림: 색 = 원인, 깜빡임 횟수 = 멈춘 단계
+void blinkCode(uint8_t r, uint8_t g, uint8_t b, int count) {
+  led(0, 0, 0); delay(600);
+  for (int i = 0; i < count; i++) { led(r, g, b); delay(350); led(0, 0, 0); delay(300); }
+  delay(600);
+}
+
 void setup() {
   pinMode(PIN_BTN, INPUT_PULLUP);
-  led(0, 0, 18);
   for (int i = 0; i < 16; i++) mtuOf[i] = 23;
+
+  // ---- 지난번에 비정상 종료됐는지 확인 ----
+  esp_reset_reason_t rr = esp_reset_reason();
+  if (rtcMagic != RTC_MAGIC) { rtcMagic = RTC_MAGIC; rtcStage = 0; rtcCrashes = 0; }
+  bool panic = rr == ESP_RST_PANIC;
+  bool wdt = rr == ESP_RST_INT_WDT || rr == ESP_RST_TASK_WDT || rr == ESP_RST_WDT;
+  bool brown = rr == ESP_RST_BROWNOUT;
+  bool crashed = panic || wdt || brown;
+  uint8_t lastStage = rtcStage;
+  rtcCrashes = crashed ? rtcCrashes + 1 : 0;
+  stage(1);
 
   prefs.begin("tvr", false);
   devName = prefs.getString("name", "");
   if (devName.length() == 0) devName = defaultName();
 
-  // 버튼을 누른 채 전원을 넣으면 초기화 (이름 + 블루투스 키보드 연결 기록)
+  // 버튼을 누른 채 전원을 넣으면 초기화 (이름 + 블루투스 키보드 연결 기록 + 안전 모드)
   bool resetAll = digitalRead(PIN_BTN) == LOW;
   if (resetAll) {
     prefs.remove("name");
+    prefs.remove("nohid");
+    prefs.remove("diag");
     devName = defaultName();
   }
 
+  if (crashed) {
+    const char *why = panic ? "오류" : wdt ? "응답 없음" : "전원 부족";
+    diag = String("재시작 원인 ") + why + ", 멈춘 단계 " + lastStage + ", 연속 " + rtcCrashes + "회";
+    // 블루투스 키보드 단계(5) 이후에서 두 번 이상 멈추면 그 기능을 끄고 시작
+    if (rtcCrashes >= 2 && lastStage >= 5) prefs.putBool("nohid", true);
+    prefs.putString("diag", diag);
+    if (panic) blinkCode(40, 0, 0, lastStage);
+    else if (wdt) blinkCode(40, 30, 0, lastStage);
+    else blinkCode(30, 30, 30, lastStage);
+  } else {
+    diag = prefs.getString("diag", "");
+  }
+  noHid = prefs.getBool("nohid", false);
+  if (noHid) diag += (diag.length() ? " · " : "") + String("안전 모드(블루투스 키보드 꺼짐)");
+
+  led(0, 0, 18);
   cmdQueue = xQueueCreate(24, sizeof(Msg));
   irInit();
 
   // USB: 키보드 + 마우스 + 미디어키 + 시스템키
+  stage(2);
   USB.productName("Field TV Remote");
   USB.manufacturerName("CHAEUM");
   Keyboard.begin();
@@ -430,53 +475,62 @@ void setup() {
   USB.begin();
 
   // BLE
+  stage(3);
   BLEDevice::init(devName.c_str());
   BLEDevice::setMTU(517);
   if (resetAll) {
     ble_store_clear();
     for (int i = 0; i < 3; i++) { led(40, 0, 0); delay(200); led(0, 0, 0); delay(200); }
+    led(0, 0, 18);
   }
 
-  // 블루투스 키보드는 'Just Works' 페어링 (비밀번호 없이)
-  BLESecurity *sec = new BLESecurity();
-  sec->setAuthenticationMode(true, false, true);   // 본딩 O, MITM X, 보안 연결 O
-  sec->setCapability(ESP_IO_CAP_NONE);
+  if (!noHid) {
+    // 블루투스 키보드는 'Just Works' 페어링 (비밀번호 없이)
+    BLESecurity *sec = new BLESecurity();
+    sec->setAuthenticationMode(true, false, true);   // 본딩 O, MITM X, 보안 연결 O
+    sec->setCapability(ESP_IO_CAP_NONE);
+  }
 
   server = BLEDevice::createServer();
   server->setCallbacks(new ServerCB());
 
   // 1) 휴대폰 앱 전용 서비스
+  stage(4);
   BLEService *svc = server->createService(SVC_UUID);
   BLECharacteristic *cmd = svc->createCharacteristic(
       CMD_UUID, BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_NR);
   cmd->setCallbacks(new CmdCB());
   infoChar = svc->createCharacteristic(
       INFO_UUID, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
-  infoChar->addDescriptor(new BLE2902());
   infoChar->setCallbacks(new InfoCB());
   svc->start();
 
   // 2) 블루투스 키보드·마우스 (HID)
-  bleHid = new BLEHIDDevice(server);
-  bleInKb = bleHid->inputReport(1);
-  bleHid->outputReport(1);  // 키보드 LED (호스트 호환용)
-  bleInCc = bleHid->inputReport(2);
-  bleInMouse = bleHid->inputReport(3);
-  bleHid->manufacturer("CHAEUM");
-  bleHid->pnp(0x02, 0x303A, 0x4001, 0x0110);
-  bleHid->hidInfo(0x00, 0x02);
-  bleHid->reportMap((uint8_t *)HID_REPORT_MAP, sizeof(HID_REPORT_MAP));
-  bleHid->startServices();
-  bleHid->setBatteryLevel(100);
+  stage(5);
+  if (!noHid) {
+    bleHid = new BLEHIDDevice(server);
+    bleInKb = bleHid->inputReport(1);
+    bleHid->outputReport(1);  // 키보드 LED (호스트 호환용)
+    bleInCc = bleHid->inputReport(2);
+    bleInMouse = bleHid->inputReport(3);
+    bleHid->manufacturer("CHAEUM");
+    bleHid->pnp(0x02, 0x303A, 0x4001, 0x0110);
+    bleHid->hidInfo(0x00, 0x02);
+    bleHid->reportMap((uint8_t *)HID_REPORT_MAP, sizeof(HID_REPORT_MAP));
+    bleHid->startServices();
+    bleHid->setBatteryLevel(100);   // 광고 시작 전이라 값만 저장됨
+  }
 
   publishInfo();
 
+  stage(6);
   BLEAdvertising *adv = BLEDevice::getAdvertising();
-  adv->setAppearance(0x03C1);  // 키보드
+  if (!noHid) adv->setAppearance(0x03C1);  // 키보드
   adv->addServiceUUID(SVC_UUID);
-  adv->addServiceUUID(bleHid->hidService()->getUUID());
+  if (!noHid) adv->addServiceUUID(bleHid->hidService()->getUUID());
   adv->setScanResponse(true);
   BLEDevice::startAdvertising();
+  stage(7);
 }
 
 void loop() {
@@ -508,6 +562,9 @@ void loop() {
 
   if (now - lastPoll > 250) {
     lastPoll = now;
+    stage(phoneConnected() ? 8 : 7);
+    static bool diagCleared = false;   // 2분 동안 문제없이 돌면 저장된 진단 기록은 지움 (이번 실행 동안은 계속 보여 줌)
+    if (!diagCleared && now > 120000) { diagCleared = true; prefs.remove("diag"); }
     bool usb = usbReady();
     int hosts = btHostCount();
     if (usb != lastUsb) { lastUsb = usb; infoDirty = true; }
