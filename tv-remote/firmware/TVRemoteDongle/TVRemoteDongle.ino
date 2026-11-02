@@ -57,7 +57,7 @@ static const int PIN_IR  = 4;   // 내장 IR LED
 static const int PIN_LED = 35;  // RGB LED (WS2812)
 static const int PIN_BTN = 41;  // 윗면 버튼
 
-static const char *FW_VERSION = "1.1.1";
+static const char *FW_VERSION = "1.1.2";
 
 // ---------------- BLE UUID ----------------
 #define SVC_UUID  "7e1a0001-5c2b-4f3a-9e7d-3c1b8a9f0a11"
@@ -345,7 +345,7 @@ void irHeader(const uint8_t *p) {
 String defaultName() {
   uint64_t mac = ESP.getEfuseMac();
   char buf[12];
-  snprintf(buf, sizeof(buf), "TVR-%02X%02X", (uint8_t)(mac >> 32), (uint8_t)(mac >> 40));
+  snprintf(buf, sizeof(buf), "HW-%02X%02X", (uint8_t)(mac >> 32), (uint8_t)(mac >> 40));
   return String(buf);
 }
 
@@ -466,7 +466,7 @@ void setup() {
 
   // USB: 키보드 + 마우스 + 미디어키 + 시스템키
   stage(2);
-  USB.productName("Field TV Remote");
+  USB.productName("HW Remote");
   USB.manufacturerName("CHAEUM");
   Keyboard.begin();
   Mouse.begin();
