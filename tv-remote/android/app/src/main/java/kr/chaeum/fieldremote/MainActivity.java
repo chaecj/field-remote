@@ -35,7 +35,7 @@ public class MainActivity extends Activity {
         Hub.init(this);
 
         Window w = getWindow();
-        int bg = Color.parseColor("#16171a");
+        int bg = Color.parseColor("#0b111b");
         w.setStatusBarColor(bg);
         w.setNavigationBarColor(bg);
 
