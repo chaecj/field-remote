@@ -311,15 +311,12 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
       <button class="key" data-act="next" aria-label="다음"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 6v12l10-6z"/><rect x="17" y="6" width="2" height="12"/></svg></button>
     </div>
 
-    <details class="more" id="numpad">
-      <summary>숫자 키패드</summary>
-      <div class="grid g3">
+    <div class="grid g3" id="numpad">
         <button class="key" data-act="d1">1</button><button class="key" data-act="d2">2</button><button class="key" data-act="d3">3</button>
         <button class="key" data-act="d4">4</button><button class="key" data-act="d5">5</button><button class="key" data-act="d6">6</button>
         <button class="key" data-act="d7">7</button><button class="key" data-act="d8">8</button><button class="key" data-act="d9">9</button>
         <span></span><button class="key" data-act="d0">0</button><span></span>
-      </div>
-    </details>
+    </div>
     <div class="log" id="log"></div>
   </section>
 
@@ -336,9 +333,8 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
       <input type="range" id="sens" min="0.6" max="4" step="0.1" value="1.8" class="grow" aria-label="커서 감도">
     </div>
     <div class="card">
-      <div class="row"><h2 class="grow">글자 입력</h2>
-        <span class="hint">실시간</span><button class="toggle" id="liveBtn" aria-pressed="false">끔</button></div>
-      <p>TV의 글자 입력 칸을 먼저 연 뒤 보내세요. 한글은 TV가 한글 모드여야 들어가요.</p>
+      <h2>글자 입력</h2>
+      <p>TV의 글자 입력 칸을 연 뒤 여기에 치면 바로 TV에 입력돼요.</p>
       <div class="row">
         <input type="text" id="textIn" placeholder="보낼 글자 (한글·영문·숫자)" autocomplete="off" autocapitalize="off" spellcheck="false">
         <button class="btn primary" id="textSend">보내기</button>
@@ -1488,13 +1484,11 @@ function bindTouchpad() {
   $$('nav.tabs [data-tab="pad"]').forEach(b => b.addEventListener('click', renderHan));
   renderHan();
   // ---- 실시간 입력: 휴대폰에서 치는 대로 바로 TV에 입력 ----
-  let live = !!store.liveText, prev = '';
+  const live = true; let prev = '';
   const syncLive = () => {
-    $('#liveBtn').setAttribute('aria-pressed', live); $('#liveBtn').textContent = live ? '켬' : '끔';
-    $('#textSend').textContent = live ? '줄바꿈' : '보내기';
-    $('#textIn').placeholder = live ? '여기에 치면 TV에 바로 입력돼요' : '보낼 글자 (한글·영문·숫자)';
+    $('#textSend').textContent = '엔터';
+    $('#textIn').placeholder = '여기에 치면 TV에 바로 입력돼요';
   };
-  $('#liveBtn').onclick = () => { live = !live; store.liveText = live; save(); $('#textIn').value = ''; prev = ''; syncLive(); if (live) $('#textIn').focus(); };
   const BS = 0x2A;
   // 한 글자 → [{k,m,han}] (han: true=한글 모드, false=영어 모드, null=상관없음)
   const charKeys = (ch) => {
