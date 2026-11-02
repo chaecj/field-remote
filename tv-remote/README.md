@@ -30,7 +30,7 @@ USB 연장선을 쓰면 동글을 TV 앞쪽 아래(리모컨 수신부 근처)�
 1. PC에서 **크롬**으로 <https://espressif.github.io/esptool-js/> 를 엽니다.
 2. AtomS3 Lite의 **리셋 버튼(옆면)을 2초간 눌러** 안쪽 초록 LED가 켜지면 손을 뗍니다. (다운로드 모드)
 3. USB-C 케이블로 PC에 연결하고 **Connect** → 목록에서 포트 선택.
-4. Flash Address `0x0`, 파일은 `firmware/TVRemoteDongle.merged.bin` 을 선택하고 **Program**.
+4. **Flash Address 칸의 기본값 `0x1000`을 반드시 `0x0`으로 바꾸고**, 파일은 `firmware/TVRemoteDongle.merged.bin` 을 선택해 **Program**. (0x1000으로 쓰면 LED가 켜지지 않음. 그때는 Erase Flash 후 0x0으로 다시 쓰기)
 5. 끝나면 케이블을 뺐다 다시 꽂습니다. LED가 **파란색**이면 성공.
 
 ### 방법 B: Arduino IDE
