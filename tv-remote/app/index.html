@@ -150,13 +150,37 @@ details.more[open] summary::after { content: "접기"; }
 details.more .grid { margin-top: 12px; }
 
 /* 터치패드 */
-.touchpad {
-  height: 44vh; min-height: 240px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line);
-  touch-action: none; position: relative; display: grid; place-items: center; color: var(--muted); font-size: 13px; text-align: center;
-  background-image: radial-gradient(circle, var(--line) 1px, transparent 1.2px); background-size: 22px 22px;
+.pad-view { gap: 12px; }
+.typebar { display: flex; gap: 8px; align-items: stretch; }
+.typebar input { flex: 1; min-width: 0; height: 48px; font-size: 16px; }
+.typebar .btn { height: 48px; padding-inline: 16px; }
+.hanpill {
+  width: 48px; flex: none; border-radius: 12px; border: 1px solid var(--line); cursor: pointer;
+  background: linear-gradient(180deg, var(--key-hi), var(--key)); font-weight: 800; font-size: 17px; color: var(--accent-2);
 }
-.touchpad.active { border-color: var(--accent); }
-.touchpad p { margin: 0; background: var(--panel); padding: 6px 10px; border-radius: 8px; }
+.hanpill.ko { color: var(--accent-ink); background: var(--grad); border-color: transparent; }
+.typekeys { display: grid; grid-template-columns: 1.2fr 1.3fr 1fr 1fr 0.9fr; gap: 6px; }
+.typekeys .key { min-height: 40px; font-size: 13px; border-radius: 11px; }
+.typekeys .key.ghost { background: transparent; box-shadow: none; border-color: var(--line); color: var(--muted); }
+.typekeys .key svg { width: 18px; height: 18px; }
+.padbox { border: 1px solid var(--line); border-radius: 20px; overflow: hidden; background: var(--panel); }
+.touchpad {
+  height: calc(100vh - 380px); min-height: 220px; max-height: 520px;
+  touch-action: none; position: relative; display: grid; place-items: center;
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--accent) 22%, transparent) 1px, transparent 1.4px); background-size: 24px 24px;
+}
+.touchpad.active { background-color: color-mix(in srgb, var(--accent) 6%, var(--panel)); }
+.padhint { color: var(--muted); font-size: 12px; pointer-events: none; opacity: 0.8; }
+.touchpad.active .padhint { opacity: 0; }
+.sens { position: absolute; top: 10px; right: 10px; display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: color-mix(in srgb, var(--bg) 70%, transparent); }
+.sens button { border: 0; background: transparent; color: var(--muted); font-size: 11.5px; padding: 5px 9px; border-radius: 999px; cursor: pointer; }
+.sens button[aria-pressed="true"] { background: var(--key-hi); color: var(--fg); font-weight: 700; }
+.padbtns { display: grid; grid-template-columns: 1fr 0.8fr 1fr; border-top: 1px solid var(--line); }
+.padbtns button { border: 0; background: transparent; height: 56px; font-weight: 600; font-size: 14px; cursor: pointer; touch-action: manipulation; }
+.padbtns button + button { border-left: 1px solid var(--line); }
+.padbtns button:active { background: var(--key-hi); }
+.padbtns #dragBtn { font-size: 12.5px; color: var(--muted); }
+.padbtns #dragBtn[aria-pressed="true"] { background: var(--grad); color: var(--accent-ink); font-weight: 700; }
 .row { display: flex; gap: 10px; align-items: center; }
 .row > * { min-width: 0; }
 .grow { flex: 1; }
@@ -321,41 +345,33 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
   </section>
 
   <!-- 터치패드 -->
-  <section class="view" id="v-pad" hidden>
-    <div class="touchpad" id="touchpad"><p>한 손가락으로 끌면 커서 이동 · 톡 치면 클릭<br>두 손가락으로 위아래 끌면 스크롤</p></div>
-    <div class="grid g3">
-      <button class="key" id="lclick">왼쪽 클릭</button>
-      <button class="key" id="dragBtn" aria-pressed="false">누른 채 끌기</button>
-      <button class="key" id="rclick">오른쪽 클릭</button>
+  <section class="view pad-view" id="v-pad" hidden>
+    <!-- 글자 입력: 위쪽에 두어 휴대폰 키보드가 올라와도 가리지 않음 -->
+    <div class="typebar">
+      <input type="text" id="textIn" placeholder="여기에 치면 TV에 바로 입력" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="TV에 입력할 글자">
+      <button class="hanpill" id="hanBtn" aria-label="한/영 전환">A</button>
+      <button class="btn primary" id="textSend">엔터</button>
     </div>
-    <div class="row">
-      <span class="label">감도</span>
-      <input type="range" id="sens" min="0.6" max="4" step="0.1" value="1.8" class="grow" aria-label="커서 감도">
+    <div class="typekeys">
+      <button class="key" data-kb="42" data-repeat>지우기</button>
+      <button class="key" data-kb="44">띄어쓰기</button>
+      <button class="key" data-kb="41">Esc</button>
+      <button class="key" data-kb="43">Tab</button>
+      <button class="key ghost" id="hanMore" aria-label="한/영 설정">설정</button>
     </div>
-    <div class="card">
-      <h2>글자 입력</h2>
-      <p>TV의 글자 입력 칸을 연 뒤 여기에 치면 바로 TV에 입력돼요.</p>
-      <div class="row">
-        <input type="text" id="textIn" placeholder="보낼 글자 (한글·영문·숫자)" autocomplete="off" autocapitalize="off" spellcheck="false">
-        <button class="btn primary" id="textSend">보내기</button>
-      </div>
-      <div class="row">
-        <button class="btn grow" id="hanBtn">한/영 전환</button>
-        <span class="hint" id="hanState"></span>
-        <button class="btn sm" id="hanFix" title="TV 화면과 표시가 다를 때">표시 맞추기</button>
-      </div>
-      <details class="more" id="hanSetup">
-        <summary>한/영 전환 방법 찾기 (TV마다 한 번)</summary>
-        <div class="grid" style="gap:10px;margin-top:12px">
-          <p class="hint">TV에서 유튜브 검색창처럼 글자 입력 칸을 열어 두고, 아래를 하나씩 ‘시험’하세요. 입력 칸에 <b>안녕</b>이 나오면 그 방법이 맞아요. 영어 <b>dkssud</b>가 나오면 다음 것을 시험하세요.</p>
-          <div id="hanList" class="grid" style="gap:8px"></div>
+
+    <!-- 터치패드: 노트북 트랙패드처럼 아래에 클릭 버튼이 붙어 있음 -->
+    <div class="padbox">
+      <div class="touchpad" id="touchpad">
+        <span class="padhint">끌기 = 커서 · 톡 = 클릭 · 두 손가락 = 스크롤</span>
+        <div class="sens" role="group" aria-label="커서 속도">
+          <button data-sens="1.1">느리게</button><button data-sens="1.8">보통</button><button data-sens="2.8">빠르게</button>
         </div>
-      </details>
-      <div class="grid g4">
-        <button class="key" data-kb="40">Enter</button>
-        <button class="key" data-kb="42" data-repeat>지우기</button>
-        <button class="key" data-kb="41">Esc</button>
-        <button class="key" data-kb="43">Tab</button>
+      </div>
+      <div class="padbtns">
+        <button id="lclick">왼쪽 클릭</button>
+        <button id="dragBtn" aria-pressed="false">끌기 고정</button>
+        <button id="rclick">오른쪽 클릭</button>
       </div>
     </div>
   </section>
@@ -1409,8 +1425,12 @@ function splitHangul(t) {
 function bindTouchpad() {
   const pad = $('#touchpad'), pts = new Map();
   let downAt = 0, moved = 0, lastY = null, dragging = false;
-  const sensEl = $('#sens'); sensEl.value = store.sens;
-  sensEl.oninput = () => { store.sens = +sensEl.value; save(); };
+  const syncSens = () => $$('.sens button').forEach(b => b.setAttribute('aria-pressed', Math.abs(+b.dataset.sens - store.sens) < 0.3));
+  $$('.sens button').forEach(b => {
+    b.addEventListener('pointerdown', (e) => e.stopPropagation());
+    b.onclick = (e) => { e.stopPropagation(); store.sens = +b.dataset.sens; save(); syncSens(); };
+  });
+  syncSens();
   pad.addEventListener('pointerdown', (e) => {
     pad.setPointerCapture(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     pad.classList.add('active');
@@ -1443,8 +1463,7 @@ function bindTouchpad() {
   $('#rclick').onclick = () => sendRaw(d => d.write([OP.CLICK, 2]));
   $('#dragBtn').onclick = (e) => {
     dragging = !dragging; e.currentTarget.setAttribute('aria-pressed', dragging);
-    e.currentTarget.classList.toggle('accent', dragging);
-    e.currentTarget.textContent = dragging ? '끌기 해제' : '누른 채 끌기';
+    e.currentTarget.textContent = dragging ? '끌기 해제' : '끌기 고정';
     sendRaw(d => d.write([dragging ? OP.MDOWN : OP.MUP, 1]));
   };
   const sendText = () => {
@@ -1466,21 +1485,30 @@ function bindTouchpad() {
   // 한/영 전환
   const renderHan = () => {
     const d = dongles.get(current); const han = d ? !!(store.hanState || {})[d.id] : false;
-    $('#hanState').textContent = d ? `지금: ${han ? '한글' : '영어'}` : '';
-    const sel = store.hanKey ?? 0;
-    $('#hanBtn').textContent = `한/영 전환 · ${HAN_KEYS[sel][0]}`;
-    $('#hanList').innerHTML = HAN_KEYS.map(([n], i) => `<div class="macro"><div class="nm">${esc(n)}${i === sel ? ' <span class="cur">사용 중</span>' : ''}</div>
-      <button class="btn sm" data-ht="${i}">시험</button><button class="btn sm primary" data-hu="${i}">이걸로</button></div>`).join('');
-    $$('[data-ht]').forEach(b => b.onclick = () => sendRaw(d => {
-      sendToggle(d, +b.dataset.ht);
-      for (const k of 'dkssud') d.write([OP.KEY_TAP, 0x04 + k.charCodeAt(0) - 97, 0], true);
-      ui.toast('보냈어요. TV 입력 칸을 확인하세요.');
-    }));
-    $$('[data-hu]').forEach(b => b.onclick = () => { store.hanKey = +b.dataset.hu; save(); renderHan(); ui.toast('한/영 전환 방법을 저장했어요'); });
+    const b = $('#hanBtn'); b.textContent = han ? '가' : 'A'; b.classList.toggle('ko', han);
+    b.setAttribute('aria-label', `한/영 전환 (지금 ${han ? '한글' : '영어'})`);
   };
   const setHan = (d, v) => { store.hanState = store.hanState || {}; store.hanState[d.id] = v; save(); renderHan(); };
   $('#hanBtn').onclick = () => sendRaw(d => { sendToggle(d); setHan(d, !(store.hanState || {})[d.id]); });
-  $('#hanFix').onclick = () => { const d = dongles.get(current); if (d) setHan(d, !(store.hanState || {})[d.id]); };
+  $('#hanMore').onclick = () => {
+    const sel = store.hanKey ?? 0;
+    openSheet(`<h3>한/영 설정</h3>
+      <div class="macro"><div class="nm">입력 버튼의 가/A 표시가 TV와 다를 때<small>표시만 바꾸고 TV에는 아무것도 보내지 않아요</small></div><button class="btn sm" data-fix>표시 바꾸기</button></div>
+      <span class="label">전환 방법 (TV마다 한 번)</span>
+      <p style="margin:0;color:var(--muted);font-size:13px">TV의 글자 입력 칸을 열고 하나씩 ‘시험’하세요. <b style="color:var(--fg)">안녕</b>이 나오면 맞는 방법이에요. <b style="color:var(--fg)">dkssud</b>가 나오면 다음 것을 시험하세요.</p>
+      <div class="grid" style="gap:8px">${HAN_KEYS.map(([n], i) => `<div class="macro"><div class="nm">${esc(n)}${i === sel ? ' <span class="cur">사용 중</span>' : ''}</div>
+        <button class="btn sm" data-ht="${i}">시험</button><button class="btn sm primary" data-hu="${i}">이걸로</button></div>`).join('')}</div>
+      <button class="btn" data-x>닫기</button>`, (s, close) => {
+      $('[data-x]', s).onclick = close;
+      $('[data-fix]', s).onclick = () => { const d = dongles.get(current); if (d) setHan(d, !(store.hanState || {})[d.id]); ui.toast('표시를 바꿨어요'); };
+      $$('[data-ht]', s).forEach(b => b.onclick = () => sendRaw(d => {
+        sendToggle(d, +b.dataset.ht);
+        for (const k of 'dkssud') d.write([OP.KEY_TAP, 0x04 + k.charCodeAt(0) - 97, 0], true);
+        ui.toast('보냈어요. TV 입력 칸을 확인하세요.');
+      }));
+      $$('[data-hu]', s).forEach(b => b.onclick = () => { store.hanKey = +b.dataset.hu; save(); close(); ui.toast(`한/영 전환: ${HAN_KEYS[+b.dataset.hu][0]}`); });
+    });
+  };
   $$('nav.tabs [data-tab="pad"]').forEach(b => b.addEventListener('click', renderHan));
   renderHan();
   // ---- 실시간 입력: 휴대폰에서 치는 대로 바로 TV에 입력 ----
