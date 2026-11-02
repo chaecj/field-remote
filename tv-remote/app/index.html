@@ -231,11 +231,14 @@ nav.tabs .in { max-width: 480px; margin: 0 auto; display: grid; grid-template-co
 /* 클리커 */
 .seg.two { grid-template-columns: repeat(2, 1fr); }
 .hint { margin: 0; color: var(--muted); font-size: 13px; }
-.clicker { display: grid; grid-template-columns: 2fr 3fr; gap: 10px; height: 38vh; min-height: 220px; }
-.cbig { font-size: 16px; border-radius: 22px; align-content: center; }
-.cbig span { font-size: 40px; line-height: 1; }
-.counter { font-size: 13.5px; color: var(--muted); }
-.counter b { color: var(--fg); font: 700 18px var(--font-mono); margin-left: 4px; }
+.clk-view { gap: 12px; }
+select.slim { padding: 9px 12px; font-size: 14px; color: var(--muted); }
+.clicker { display: grid; grid-template-columns: 2fr 3fr; gap: 10px; height: calc(100vh - 420px); min-height: 240px; max-height: 520px; }
+.cbig { font-size: 16px; border-radius: 24px; align-content: center; gap: 6px; }
+.cbig svg { width: 44px; height: 44px; }
+#clkKeys .key { min-height: 48px; }
+.volrow { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); font-size: 14px; font-weight: 600; }
+.volrow small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; margin-top: 2px; }
 nav.tabs button { border: 0; background: transparent; padding: 10px 0 12px; display: grid; justify-items: center; gap: 3px; font-size: 11.5px; color: var(--muted); cursor: pointer; }
 nav.tabs button svg { width: 22px; height: 22px; }
 nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; }
@@ -377,36 +380,20 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
   </section>
 
   <!-- 클리커 -->
-  <section class="view" id="v-clk" hidden>
+  <section class="view clk-view" id="v-clk" hidden>
     <div class="seg two" id="clkMode">
       <button data-cm="pc" aria-pressed="true">노트북·전자칠판</button>
-      <button data-cm="tv" aria-pressed="false">TV 사진 넘기기</button>
+      <button data-cm="tv" aria-pressed="false">TV 사진</button>
     </div>
-    <div class="row" id="clkProgRow">
-      <span class="label">프로그램</span>
-      <select id="clkProg" class="grow" aria-label="발표 프로그램"></select>
-    </div>
-    <p class="hint" id="clkHint"></p>
+    <select id="clkProg" class="slim" aria-label="발표 프로그램"></select>
     <div class="clicker">
-      <button class="key cbig" id="clkPrev" aria-label="이전"><span>◀</span>이전</button>
-      <button class="key cbig accent" id="clkNext" aria-label="다음"><span>▶</span>다음</button>
-    </div>
-    <div class="row counter">
-      <span class="grow">넘긴 횟수 <b id="clkCount">0</b></span>
-      <button class="btn sm" id="clkReset">0으로</button>
+      <button class="key cbig" id="clkPrev" aria-label="이전"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>이전</button>
+      <button class="key cbig accent" id="clkNext" aria-label="다음"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>다음</button>
     </div>
     <div class="grid g3" id="clkKeys"></div>
-    <div class="card" id="volCard" hidden>
-      <div class="row"><div class="grow"><b>볼륨 버튼으로 넘기기</b><p class="hint">아래 = 다음, 위 = 이전. 화면이 꺼져 있어도 됩니다.</p></div>
-        <button class="toggle" id="volBtn" aria-pressed="false">끔</button></div>
-      <div class="row"><span class="grow hint">버튼 방향 반대로</span><button class="toggle" id="volSwap" aria-pressed="false">끔</button></div>
-    </div>
-    <div class="card" id="clkJump">
-      <h2>슬라이드 번호로 이동</h2>
-      <div class="row">
-        <input type="number" id="clkNum" inputmode="numeric" min="1" placeholder="번호" aria-label="슬라이드 번호">
-        <button class="btn primary" id="clkGo">이동</button>
-      </div>
+    <div class="volrow" id="volCard" hidden>
+      <span class="grow">볼륨 버튼으로 넘기기<small>아래 = 다음 · 위 = 이전 · 화면 꺼져도 됨</small></span>
+      <button class="toggle" id="volBtn" aria-pressed="false">끔</button>
     </div>
   </section>
 
@@ -1627,10 +1614,19 @@ function clickerPackets(d, dir) {
 }
 const CLK_TV_KEYS = [['슬라이드쇼 재생', 'play'], ['일시정지', 'pause'], ['확인', 'ok'], ['뒤로', 'back'], ['정지', 'stop'], ['홈', 'home']];
 
+// 클리커에 보일 핵심 버튼 3개 (프로그램별)  [표시 이름, CLK_PROGS 안의 이름]
+const CLK_CORE = {
+  ppt_win: [['시작', '처음부터 시작'], ['검은 화면', '검은 화면'], ['끝내기', '발표 끝내기']],
+  ppt_mac: [['시작', '처음부터 시작'], ['검은 화면', '검은 화면'], ['끝내기', '발표 끝내기']],
+  keynote: [['시작', '발표 시작'], ['검은 화면', '검은 화면'], ['끝내기', '발표 끝내기']],
+  gslides: [['시작', '처음부터 시작'], ['검은 화면', '검은 화면'], ['끝내기', '발표 끝내기']],
+  board: [['홈', '홈'], ['뒤로', '뒤로'], ['검은 화면', '검은 화면']],
+  other: [['전체 화면', '전체 화면'], ['첫 장', '첫 장'], ['나가기', '나가기']],
+};
+const CLK_TV_CORE = [['재생', 'play'], ['확인', 'ok'], ['뒤로', 'back']];
+
 function bindClicker() {
   const st = store.clk = Object.assign({ mode: 'pc', prog: 'ppt_win' }, store.clk || {});
-  let count = 0;
-  const setCount = (n) => { count = Math.max(0, n); $('#clkCount').textContent = count; };
   const sel = $('#clkProg');
   sel.innerHTML = Object.entries(CLK_PROGS).map(([k, p]) => `<option value="${k}">${p.label}</option>`).join('');
   sel.value = st.prog;
@@ -1638,19 +1634,13 @@ function bindClicker() {
   const render = () => {
     $$('#clkMode button').forEach(b => b.setAttribute('aria-pressed', b.dataset.cm === st.mode));
     const pc = st.mode === 'pc', prog = CLK_PROGS[st.prog];
-    $('#clkProgRow').hidden = !pc;
-    $('#clkJump').hidden = !(pc && prog.jump);
-    $('#clkHint').textContent = pc
-      ? '동글을 노트북·전자칠판 USB에 꽂거나, 전자칠판의 블루투스 설정에서 동글을 키보드로 연결하세요(TV 설정 탭 안내). 발표 화면이 앞에 떠 있어야 합니다. 윈도우 전자칠판은 파워포인트(Windows)를 고르세요.'
-      : 'TV에 꽂은 USB의 사진을 넘깁니다. 사진 보기 화면을 띄운 뒤 쓰세요. 이 TV의 리모컨 설정(브랜드·버튼 지정)을 그대로 씁니다.';
+    sel.hidden = !pc;
     const box = $('#clkKeys'); box.innerHTML = '';
-    const list = pc ? prog.keys : CLK_TV_KEYS;
+    const list = pc ? CLK_CORE[st.prog].map(([lab, name]) => [lab, (prog.keys.find(k => k[0] === name) || [])[1]]) : CLK_TV_CORE;
     for (const [label, v] of list) {
+      if (!v) continue;
       const b = document.createElement('button'); b.className = 'key'; b.textContent = label;
-      b.onclick = () => {
-        if (pc) pcKey(v); else runAction(v);
-        if (/시작|재생/.test(label) || label === '첫 장') setCount(0);
-      };
+      b.onclick = () => { if (pc) pcKey(v); else runAction(v); };
       box.appendChild(b);
     }
   };
@@ -1659,33 +1649,18 @@ function bindClicker() {
     if (navigator.vibrate) navigator.vibrate(dir > 0 ? 18 : [8, 40, 8]);
     if (st.mode === 'pc') pcKey([dir > 0 ? K.right : K.left, 0]);
     else runAction(dir > 0 ? 'right' : 'left');
-    setCount(count + dir);
   };
   $('#clkNext').onclick = () => step(1);
   $('#clkPrev').onclick = () => step(-1);
-  $('#clkReset').onclick = () => setCount(0);
-  window.__clk = { count: (dir) => setCount(count + dir) };
+  window.__clk = { count: () => {} };
   if (NATIVE) {
     $('#volCard').hidden = false;
-    const sync = () => {
-      $('#volBtn').setAttribute('aria-pressed', !!st.volume); $('#volBtn').textContent = st.volume ? '켬' : '끔';
-      $('#volSwap').setAttribute('aria-pressed', !!st.swap); $('#volSwap').textContent = st.swap ? '켬' : '끔';
-    };
+    const sync = () => { $('#volBtn').setAttribute('aria-pressed', !!st.volume); $('#volBtn').textContent = st.volume ? '켬' : '끔'; };
     $('#volBtn').onclick = () => { st.volume = !st.volume; save(); sync(); pushVolumeConfig(); ui.toast(st.volume ? '볼륨 버튼으로 넘깁니다' : '볼륨 버튼이 원래대로 돌아왔어요'); };
-    $('#volSwap').onclick = () => { st.swap = !st.swap; save(); sync(); pushVolumeConfig(); };
     sync();
   }
   $$('#clkMode button').forEach(b => b.onclick = () => { st.mode = b.dataset.cm; save(); render(); pushVolumeConfig(); });
   sel.onchange = () => { st.prog = sel.value; save(); render(); pushVolumeConfig(); };
-  $('#clkGo').onclick = () => {
-    const n = parseInt($('#clkNum').value, 10);
-    if (!(n > 0)) { ui.toast('이동할 슬라이드 번호를 넣어 주세요.'); return; }
-    sendRaw(d => {
-      for (const ch of String(n)) d.write([OP.KEY_TAP, ch === '0' ? 0x27 : 0x1D + +ch, 0]);
-      d.write([OP.KEY_TAP, K.enter, 0]);
-    });
-    setCount(n - 1); $('#clkNum').value = '';
-  };
   render();
 }
 
