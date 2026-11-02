@@ -282,6 +282,50 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
 .hidlog { margin: 0; font: 11.5px/1.5 var(--font-mono); color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
 .log { font: 11.5px var(--font-mono); color: var(--muted); min-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ---------- 가로 화면 (태블릿·휴대폰 가로): 2단 배치 ---------- */
+@media (orientation: landscape) and (min-width: 700px) {
+  .app { max-width: 1180px; padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)); }
+  nav.tabs .in { max-width: 720px; }
+  nav.tabs button { padding: 7px 0 9px; }
+  section.view { grid-template-columns: 1fr 1fr; column-gap: 20px; align-items: start; grid-auto-flow: row dense; }
+  section.view > * { grid-column: 2; min-width: 0; }
+
+  /* 리모컨: 왼쪽 = 전원줄 + 방향키, 오른쪽 = 나머지 */
+  #v-remote > .g4:first-child, #v-remote > .pad-wrap { grid-column: 1; }
+  #v-remote > .pad-wrap { grid-row: 2 / span 2; }
+  #v-remote .dpad { max-width: 300px; }
+  #v-remote .rocker { height: 220px; }
+  #v-remote .log { grid-column: 1 / -1; }
+
+  /* 터치패드: 왼쪽 = 글자 입력, 오른쪽 = 패드 */
+  .pad-view > .typebar, .pad-view > .typekeys { grid-column: 1; }
+  .pad-view > .padbox { grid-row: 1 / span 3; }
+  .pad-view .touchpad { height: calc(100vh - 260px); max-height: none; min-height: 200px; }
+
+  /* 클리커: 왼쪽 = 설정·보조 버튼, 오른쪽 = 이전/다음 */
+  .clk-view > #clkMode, .clk-view > #clkProg, .clk-view > #clkKeys, .clk-view > #volCard { grid-column: 1; }
+  .clk-view > .clicker { grid-row: 1 / span 5; height: calc(100vh - 220px); max-height: none; min-height: 200px; }
+
+  /* 화면 조정: 왼쪽 = 밝기·명암 조절, 오른쪽 = 메뉴 이동 */
+  .pic-view > #picTarget, .pic-view > .adj, .pic-view > .adjfoot, .pic-view > #pathRow { grid-column: 1; }
+  .pic-view > .minipad { grid-row: 1 / span 4; }
+  .pic-view > .tiplink { justify-self: center; }
+
+  /* TV 설정: 카드 2열 */
+  #v-set { grid-template-columns: 1fr; }
+  #v-set > * { grid-column: 1; }
+  #setBody { grid-template-columns: 1fr 1fr; align-items: start; }
+
+  .sheet .in { max-width: 560px; }
+}
+/* 높이가 낮은 가로 화면(휴대폰 가로)에서는 큰 버튼을 조금 줄임 */
+@media (orientation: landscape) and (max-height: 500px) {
+  header.top { padding-block: 6px 4px; gap: 6px; }
+  .adj { height: 110px; }
+  #v-remote .rocker { height: 170px; }
+  #v-remote .dpad { max-width: 210px; }
+}
 </style>
 </head>
 <body>
