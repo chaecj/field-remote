@@ -336,7 +336,8 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
       <input type="range" id="sens" min="0.6" max="4" step="0.1" value="1.8" class="grow" aria-label="커서 감도">
     </div>
     <div class="card">
-      <h2>글자 입력</h2>
+      <div class="row"><h2 class="grow">글자 입력</h2>
+        <span class="hint">실시간</span><button class="toggle" id="liveBtn" aria-pressed="false">끔</button></div>
       <p>TV의 글자 입력 칸을 먼저 연 뒤 보내세요. 한글은 TV가 한글 모드여야 들어가요.</p>
       <div class="row">
         <input type="text" id="textIn" placeholder="보낼 글자 (한글·영문·숫자)" autocomplete="off" autocapitalize="off" spellcheck="false">
@@ -1351,6 +1352,22 @@ function bindKeys() {
 }
 
 /* ---------------- 한글 → 두벌식 키 ---------------- */
+// 영문 키보드 기준 ASCII 한 글자 → [키코드, 수식키]
+function asciiKey(c) {
+  if (c >= 'a' && c <= 'z') return [0x04 + c.charCodeAt(0) - 97, 0];
+  if (c >= 'A' && c <= 'Z') return [0x04 + c.charCodeAt(0) - 65, 2];
+  if (c >= '1' && c <= '9') return [0x1E + c.charCodeAt(0) - 49, 0];
+  if (c === '0') return [0x27, 0];
+  if (c === ' ') return [0x2C, 0];
+  if (c === '\n') return [0x28, 0];
+  const plain = "-=[]\\;'`,./", shifted = '_+{}|:"~<>?', num = '!@#$%^&*()';
+  const pk = [0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38];
+  let i;
+  if ((i = plain.indexOf(c)) >= 0) return [pk[i], 0];
+  if ((i = shifted.indexOf(c)) >= 0) return [pk[i], 2];
+  if ((i = num.indexOf(c)) >= 0) return [i === 9 ? 0x27 : 0x1E + i, 2];
+  return null;
+}
 // [이름, 키코드, 수식키]  수식키: 1=Ctrl 2=Shift 4=Alt 8=Win
 const HAN_KEYS = [['한/영 키', 0x90, 0], ['오른쪽 Alt', 0xE6, 0], ['Shift + Space', 0x2C, 2], ['Ctrl + Space', 0x2C, 1], ['Win + Space', 0x2C, 8], ['Alt + Shift', 0xE1, 4]];
 function sendToggle(d, idx) { const [, k, m] = HAN_KEYS[idx ?? store.hanKey ?? 0]; d.write([OP.KEY_TAP, k, m], true); }
@@ -1470,8 +1487,60 @@ function bindTouchpad() {
   $('#hanFix').onclick = () => { const d = dongles.get(current); if (d) setHan(d, !(store.hanState || {})[d.id]); };
   $$('nav.tabs [data-tab="pad"]').forEach(b => b.addEventListener('click', renderHan));
   renderHan();
-  $('#textSend').onclick = sendText;
-  $('#textIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendText(); });
+  // ---- 실시간 입력: 휴대폰에서 치는 대로 바로 TV에 입력 ----
+  let live = !!store.liveText, prev = '';
+  const syncLive = () => {
+    $('#liveBtn').setAttribute('aria-pressed', live); $('#liveBtn').textContent = live ? '켬' : '끔';
+    $('#textSend').textContent = live ? '줄바꿈' : '보내기';
+    $('#textIn').placeholder = live ? '여기에 치면 TV에 바로 입력돼요' : '보낼 글자 (한글·영문·숫자)';
+  };
+  $('#liveBtn').onclick = () => { live = !live; store.liveText = live; save(); $('#textIn').value = ''; prev = ''; syncLive(); if (live) $('#textIn').focus(); };
+  const BS = 0x2A;
+  // 한 글자 → [{k,m,han}] (han: true=한글 모드, false=영어 모드, null=상관없음)
+  const charKeys = (ch) => {
+    const hk = hangulKeys(ch);
+    if (hk) return hk.map(([k, m]) => ({ k, m, han: true }));
+    const a = asciiKey(ch);
+    if (a) return [{ k: a[0], m: a[1], han: /[A-Za-z]/.test(ch) ? false : null }];
+    return null;
+  };
+  const strKeys = (s) => { const out = []; for (const ch of s) { const k = charKeys(ch); if (!k) return null; out.push(...k); } return out; };
+  const typeKeys = (d, list) => {
+    let han = !!(store.hanState || {})[d.id];
+    for (const x of list) {
+      if (x.han !== null && x.han !== han) { sendToggle(d); han = x.han; }
+      d.write([OP.KEY_TAP, x.k, x.m], true);
+    }
+    store.hanState = store.hanState || {}; store.hanState[d.id] = han; save();
+  };
+  const liveSend = () => {
+    const now = $('#textIn').value;
+    if (now === prev) return;
+    let p = 0; const a = [...prev], b = [...now];
+    while (p < a.length && p < b.length && a[p] === b[p]) p++;
+    const oldTail = a.slice(p).join(''), newTail = b.slice(p).join('');
+    const kOld = strKeys(oldTail) || [], kNew = strKeys(newTail);
+    if (!kNew) { ui.toast('보낼 수 없는 글자가 있어요'); $('#textIn').value = prev; return; }
+    const isPrefix = (x, y) => x.length <= y.length && x.every((v, i) => v.k === y[i].k && v.m === y[i].m);
+    sendRaw(d => {
+      if (isPrefix(kOld, kNew)) typeKeys(d, kNew.slice(kOld.length));                       // 이어서 치기 (한글 조합 포함)
+      else if (isPrefix(kNew, kOld) && [...oldTail].length === [...newTail].length) {         // 조합 중인 글자에서 자모 지우기
+        for (let i = 0; i < kOld.length - kNew.length; i++) d.write([OP.KEY_TAP, BS, 0], true);
+      } else {                                                                              // 글자 지우기·바꾸기
+        for (let i = 0; i < [...oldTail].length; i++) d.write([OP.KEY_TAP, BS, 0], true);
+        typeKeys(d, kNew);
+      }
+    });
+    prev = now; renderHan();
+  };
+  $('#textIn').addEventListener('input', () => { if (live) liveSend(); });
+  $('#textIn').addEventListener('keydown', (e) => {
+    if (live && (e.key === 'Backspace' || e.keyCode === 8) && $('#textIn').value === '') { sendRaw(d => d.write([OP.KEY_TAP, BS, 0], true)); }
+    if (e.key === 'Enter') { e.preventDefault(); live ? liveEnter() : sendText(); }
+  });
+  const liveEnter = () => { liveSend(); sendRaw(d => d.write([OP.KEY_TAP, 0x28, 0], true)); $('#textIn').value = ''; prev = ''; };
+  $('#textSend').onclick = () => live ? liveEnter() : sendText();
+  syncLive();
 }
 
 function bindPicture() {
