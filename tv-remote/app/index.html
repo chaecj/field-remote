@@ -325,11 +325,23 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
     </div>
     <div class="card">
       <h2>글자 입력</h2>
-      <p>Wi-Fi 비밀번호처럼 영문·숫자·기호를 TV에 입력합니다. 한글은 보낼 수 없어요.</p>
+      <p>TV의 글자 입력 칸을 먼저 연 뒤 보내세요. 한글은 TV가 한글 모드여야 들어가요.</p>
       <div class="row">
-        <input type="text" id="textIn" placeholder="보낼 글자" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <input type="text" id="textIn" placeholder="보낼 글자 (한글·영문·숫자)" autocomplete="off" autocapitalize="off" spellcheck="false">
         <button class="btn primary" id="textSend">보내기</button>
       </div>
+      <div class="row">
+        <button class="btn grow" id="hanBtn">한/영 전환</button>
+        <span class="hint" id="hanState"></span>
+        <button class="btn sm" id="hanFix" title="TV 화면과 표시가 다를 때">표시 맞추기</button>
+      </div>
+      <details class="more" id="hanSetup">
+        <summary>한/영 전환 방법 찾기 (TV마다 한 번)</summary>
+        <div class="grid" style="gap:10px;margin-top:12px">
+          <p class="hint">TV에서 유튜브 검색창처럼 글자 입력 칸을 열어 두고, 아래를 하나씩 ‘시험’하세요. 입력 칸에 <b>안녕</b>이 나오면 그 방법이 맞아요. 영어 <b>dkssud</b>가 나오면 다음 것을 시험하세요.</p>
+          <div id="hanList" class="grid" style="gap:8px"></div>
+        </div>
+      </details>
       <div class="grid g4">
         <button class="key" data-kb="40">Enter</button>
         <button class="key" data-kb="42" data-repeat>지우기</button>
@@ -1301,6 +1313,49 @@ function bindKeys() {
   $$('[data-kb]').forEach(b => press(b, () => sendRaw(d => d.write([OP.KEY_TAP, +b.dataset.kb, 0]))));
 }
 
+/* ---------------- 한글 → 두벌식 키 ---------------- */
+// [이름, 키코드, 수식키]  수식키: 1=Ctrl 2=Shift 4=Alt 8=Win
+const HAN_KEYS = [['한/영 키', 0x90, 0], ['오른쪽 Alt', 0xE6, 0], ['Shift + Space', 0x2C, 2], ['Ctrl + Space', 0x2C, 1], ['Win + Space', 0x2C, 8], ['Alt + Shift', 0xE1, 4]];
+function sendToggle(d, idx) { const [, k, m] = HAN_KEYS[idx ?? store.hanKey ?? 0]; d.write([OP.KEY_TAP, k, m], true); }
+const JAMO_KEY = (() => {
+  const plain = 'ㅂqㅈwㄷeㄱrㅅtㅛyㅕuㅑiㅐoㅔpㅁaㄴsㅇdㄹfㅎgㅗhㅓjㅏkㅣlㅋzㅌxㅊcㅍvㅠbㅜnㅡm';
+  const shift = 'ㅃqㅉwㄸeㄲrㅆtㅒoㅖp';
+  const m = {};
+  for (let i = 0; i < plain.length; i += 2) m[plain[i]] = [[0x04 + plain.charCodeAt(i + 1) - 97, 0]];
+  for (let i = 0; i < shift.length; i += 2) m[shift[i]] = [[0x04 + shift.charCodeAt(i + 1) - 97, 2]];
+  const combo = { ㅘ: 'ㅗㅏ', ㅙ: 'ㅗㅐ', ㅚ: 'ㅗㅣ', ㅝ: 'ㅜㅓ', ㅞ: 'ㅜㅔ', ㅟ: 'ㅜㅣ', ㅢ: 'ㅡㅣ',
+    ㄳ: 'ㄱㅅ', ㄵ: 'ㄴㅈ', ㄶ: 'ㄴㅎ', ㄺ: 'ㄹㄱ', ㄻ: 'ㄹㅁ', ㄼ: 'ㄹㅂ', ㄽ: 'ㄹㅅ', ㄾ: 'ㄹㅌ', ㄿ: 'ㄹㅍ', ㅀ: 'ㄹㅎ', ㅄ: 'ㅂㅅ' };
+  for (const [c, parts] of Object.entries(combo)) m[c] = [...parts].flatMap(p => m[p]);
+  return m;
+})();
+const CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ', JUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ', JONG = ' ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ';
+function hangulKeys(ch) {
+  const c = ch.charCodeAt(0);
+  if (c >= 0xAC00 && c <= 0xD7A3) {
+    const s = c - 0xAC00, jong = s % 28;
+    return [...JAMO_KEY[CHO[Math.floor(s / 588)]], ...JAMO_KEY[JUNG[Math.floor((s % 588) / 28)]], ...(jong ? JAMO_KEY[JONG[jong]] : [])];
+  }
+  return JAMO_KEY[ch] || null;
+}
+// 글자를 [한글 묶음 / 영문 묶음]으로 나눔. han: true=한글 모드 필요, false=영어 모드 필요, null=어느 모드든 됨(숫자·기호·공백)
+function splitHangul(t) {
+  const out = [];
+  for (const ch of t) {
+    const hk = hangulKeys(ch);
+    let seg;
+    if (hk) seg = { han: true, keys: hk };
+    else if (/[A-Za-z]/.test(ch)) seg = { han: false, text: ch };
+    else if (/[\x20-\x7E\n]/.test(ch)) seg = { han: null, text: ch };
+    else return null;
+    const last = out[out.length - 1];
+    if (last && seg.han === true && last.han === true) last.keys.push(...seg.keys);
+    else if (last && seg.han !== true && last.han !== true && (seg.han === null || last.han === null || seg.han === last.han)) {
+      last.text += seg.text; if (last.han === null) last.han = seg.han;
+    } else out.push(seg);
+  }
+  return out;
+}
+
 function bindTouchpad() {
   const pad = $('#touchpad'), pts = new Map();
   let downAt = 0, moved = 0, lastY = null, dragging = false;
@@ -1345,10 +1400,39 @@ function bindTouchpad() {
   const sendText = () => {
     const t = $('#textIn').value;
     if (!t) return;
-    if (/[^\x20-\x7E]/.test(t)) { ui.toast('영문·숫자·기호만 보낼 수 있어요.'); return; }
-    sendRaw(d => { const max = d.payloadMax - 1; for (let i = 0; i < t.length; i += max) d.write([OP.TEXT, ...enc.encode(t.slice(i, i + max))], true); });
+    const segs = splitHangul(t);
+    if (!segs) { ui.toast('한글·영문·숫자·기호만 보낼 수 있어요.'); return; }
+    sendRaw(d => {
+      let han = !!(store.hanState || {})[d.id];
+      for (const s of segs) {
+        if (s.han !== null && s.han !== han) { sendToggle(d); han = s.han; }
+        if (s.han) for (const [k, m] of s.keys) d.write([OP.KEY_TAP, k, m], true);
+        else { const max = d.payloadMax - 1; for (let i = 0; i < s.text.length; i += max) d.write([OP.TEXT, ...enc.encode(s.text.slice(i, i + max))], true); }
+      }
+      setHan(d, han);
+    });
     ui.toast(`${t.length}글자를 보냈어요`); $('#textIn').value = '';
   };
+  // 한/영 전환
+  const renderHan = () => {
+    const d = dongles.get(current); const han = d ? !!(store.hanState || {})[d.id] : false;
+    $('#hanState').textContent = d ? `지금: ${han ? '한글' : '영어'}` : '';
+    const sel = store.hanKey ?? 0;
+    $('#hanBtn').textContent = `한/영 전환 · ${HAN_KEYS[sel][0]}`;
+    $('#hanList').innerHTML = HAN_KEYS.map(([n], i) => `<div class="macro"><div class="nm">${esc(n)}${i === sel ? ' <span class="cur">사용 중</span>' : ''}</div>
+      <button class="btn sm" data-ht="${i}">시험</button><button class="btn sm primary" data-hu="${i}">이걸로</button></div>`).join('');
+    $$('[data-ht]').forEach(b => b.onclick = () => sendRaw(d => {
+      sendToggle(d, +b.dataset.ht);
+      for (const k of 'dkssud') d.write([OP.KEY_TAP, 0x04 + k.charCodeAt(0) - 97, 0], true);
+      ui.toast('보냈어요. TV 입력 칸을 확인하세요.');
+    }));
+    $$('[data-hu]').forEach(b => b.onclick = () => { store.hanKey = +b.dataset.hu; save(); renderHan(); ui.toast('한/영 전환 방법을 저장했어요'); });
+  };
+  const setHan = (d, v) => { store.hanState = store.hanState || {}; store.hanState[d.id] = v; save(); renderHan(); };
+  $('#hanBtn').onclick = () => sendRaw(d => { sendToggle(d); setHan(d, !(store.hanState || {})[d.id]); });
+  $('#hanFix').onclick = () => { const d = dongles.get(current); if (d) setHan(d, !(store.hanState || {})[d.id]); };
+  $$('nav.tabs [data-tab="pad"]').forEach(b => b.addEventListener('click', renderHan));
+  renderHan();
   $('#textSend').onclick = sendText;
   $('#textIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendText(); });
 }
