@@ -372,7 +372,7 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
       <button class="key" data-kb="42" data-repeat>지우기</button>
       <button class="key" data-kb="44">띄어쓰기</button>
       <button class="key" data-kb="41">Esc</button>
-      <button class="key" data-kb="43">Tab</button>
+      <button class="key" id="hanFlip" title="한글이 영어로(또는 반대로) 나올 때">한영 반대</button>
       <button class="key ghost" id="hanMore" aria-label="한/영 설정">설정</button>
     </div>
 
@@ -1480,6 +1480,17 @@ function bindTouchpad() {
     b.setAttribute('aria-label', `한/영 전환 (지금 ${han ? '한글' : '영어'})`);
   };
   const setHan = (d, v) => { store.hanState = store.hanState || {}; store.hanState[d.id] = v; save(); renderHan(); };
+  // 한/영이 반대로 나올 때: 앱이 알고 있는 TV 상태만 뒤집음 (TV에는 아무것도 보내지 않음)
+  const flipHan = () => {
+    const d = dongles.get(current); if (!d) return;
+    const now = !(store.hanState || {})[d.id];
+    setHan(d, now);
+    $('#textIn').value = ''; prev = '';
+    ui.toast(`맞췄어요. TV가 지금 ${now ? '한글' : '영어'} 상태라고 보고 입력해요. 다시 쳐 주세요.`);
+    $('#textIn').focus();
+  };
+  $('#hanFlip').onclick = flipHan;
+
   $('#hanBtn').onclick = () => sendRaw(d => { sendToggle(d); setHan(d, !(store.hanState || {})[d.id]); });
   $('#hanMore').onclick = () => {
     const sel = store.hanKey ?? 0;
@@ -1491,7 +1502,7 @@ function bindTouchpad() {
         <button class="btn sm" data-ht="${i}">시험</button><button class="btn sm primary" data-hu="${i}">이걸로</button></div>`).join('')}</div>
       <button class="btn" data-x>닫기</button>`, (s, close) => {
       $('[data-x]', s).onclick = close;
-      $('[data-fix]', s).onclick = () => { const d = dongles.get(current); if (d) setHan(d, !(store.hanState || {})[d.id]); ui.toast('표시를 바꿨어요'); };
+      $('[data-fix]', s).onclick = () => { close(); flipHan(); };
       $$('[data-ht]', s).forEach(b => b.onclick = () => sendRaw(d => {
         sendToggle(d, +b.dataset.ht);
         for (const k of 'dkssud') d.write([OP.KEY_TAP, 0x04 + k.charCodeAt(0) - 97, 0], true);
