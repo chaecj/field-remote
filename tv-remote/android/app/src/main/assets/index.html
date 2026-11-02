@@ -232,6 +232,19 @@ nav.tabs .in { max-width: 480px; margin: 0 auto; display: grid; grid-template-co
 .seg.two { grid-template-columns: repeat(2, 1fr); }
 .hint { margin: 0; color: var(--muted); font-size: 13px; }
 .clk-view { gap: 12px; }
+.pic-view { gap: 12px; }
+.adj { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; height: 150px; }
+.adjbtn { border-radius: 22px; font-size: 14px; gap: 2px; align-content: center; }
+.adjbtn span { font-size: 44px; line-height: 1; font-weight: 400; }
+.adjfoot { display: flex; align-items: center; gap: 8px; }
+.sens.static { position: static; background: var(--panel); border: 1px solid var(--line); }
+.pathrow { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); font-size: 13.5px; }
+.pathrow .grow small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.pathrow.todo { border-color: var(--accent); border-style: dashed; }
+.minipad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.minipad .key { min-height: 50px; }
+.minipad .dpok { background: var(--grad); color: var(--accent-ink); }
+.tiplink { border: 0; background: none; color: var(--muted); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; padding: 6px 0; cursor: pointer; justify-self: center; }
 select.slim { padding: 9px 12px; font-size: 14px; color: var(--muted); }
 .clicker { display: grid; grid-template-columns: 2fr 3fr; gap: 10px; height: calc(100vh - 420px); min-height: 240px; max-height: 520px; }
 .cbig { font-size: 16px; border-radius: 24px; align-content: center; gap: 6px; }
@@ -288,7 +301,7 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
     <div class="recbar" id="recBar" hidden>
       <span class="r"></span><span class="grow" id="recText">녹화 중</span>
       <button class="btn sm" id="recCancel">취소</button>
-      <button class="btn sm primary" id="recStop">끝내기</button>
+      <button class="btn sm primary" id="recStop">여기서 저장</button>
     </div>
   </header>
 
@@ -397,52 +410,41 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
     </div>
   </section>
 
-  <!-- 화면 조정 -->
-  <section class="view" id="v-pic" hidden>
-    <div class="card">
-      <h2>메뉴 이동</h2>
-      <div class="grid g3">
-        <button class="key accent" data-act="menu">설정 열기</button>
-        <button class="key" data-act="up" data-repeat aria-label="위">▲</button>
-        <button class="key" data-act="back">뒤로</button>
-        <button class="key" data-act="left" data-repeat aria-label="왼쪽">◀</button>
-        <button class="key" data-act="ok">확인</button>
-        <button class="key" data-act="right" data-repeat aria-label="오른쪽">▶</button>
-        <button class="key" data-act="exit">나가기</button>
-        <button class="key" data-act="down" data-repeat aria-label="아래">▼</button>
-        <button class="key" data-act="home">홈</button>
-      </div>
+  <!-- 화면 조정: TV 자체의 밝기·명암 -->
+  <section class="view pic-view" id="v-pic" hidden>
+    <div class="seg two" id="picTarget">
+      <button data-pt="bright" aria-pressed="true">밝기</button>
+      <button data-pt="contrast" aria-pressed="false">명암</button>
     </div>
-    <div class="card">
-      <h2>값 한 번에 조절</h2>
-      <p>밝기·명암 같은 슬라이더에 들어간 상태에서 누르세요.</p>
-      <div class="mult" id="multBtns">
-        <button class="btn sm" data-n="1">×1</button>
-        <button class="btn sm primary" data-n="5">×5</button>
-        <button class="btn sm" data-n="10">×10</button>
-        <button class="btn sm" data-n="20">×20</button>
-      </div>
-      <div class="grid g3">
-        <button class="key" id="stepDown">◀ 내리기</button>
-        <span></span>
-        <button class="key" id="stepUp">올리기 ▶</button>
-      </div>
+
+    <div class="adj">
+      <button class="key adjbtn" id="adjDown" aria-label="낮추기"><span>−</span>낮추기</button>
+      <button class="key adjbtn accent" id="adjUp" aria-label="높이기"><span>+</span>높이기</button>
     </div>
-    <div class="card">
-      <div class="row"><h2 class="grow">바로가기 매크로</h2><button class="btn sm" id="recStart">● 녹화</button></div>
-      <p>‘설정 → 화면 → 밝기’처럼 매번 누르는 순서를 한 번 녹화해 두면 버튼 하나로 그 메뉴까지 갑니다. 매크로는 지금 선택한 TV에 저장돼요.</p>
-      <div id="macroList" class="grid"></div>
+    <div class="adjfoot">
+      <span class="hint">한 번에</span>
+      <div class="sens static" id="multBtns" role="group" aria-label="한 번에 움직일 칸 수">
+        <button data-n="1">1칸</button><button data-n="5">5칸</button><button data-n="10">10칸</button>
+      </div>
+      <span class="grow"></span>
+      <button class="btn sm" id="adjClose">메뉴 닫기</button>
     </div>
-    <details class="card more" id="flickerTips">
-      <summary><b>카메라 플리커·밝기 맞추기</b></summary>
-      <ul class="tips">
-        <li><b>백라이트(밝기)는 최대 근처</b>로 두고, 화면 밝기는 명암·감마로 낮추세요. 많은 TV가 백라이트를 낮출 때 깜빡임(PWM)으로 밝기를 줄여서 카메라에 줄무늬가 생깁니다.</li>
-        <li>그래도 너무 밝으면 <b>화면에 ND 필름</b>을 붙이거나 소품 이미지 자체를 어둡게 만드는 편이 깜빡임 없이 안전합니다.</li>
-        <li><b>절전·에코 모드, 자동 밝기(조도 센서), 동작 보정(모션 플러스·트루모션)</b>을 끄세요. 테이크마다 밝기가 달라지는 걸 막습니다.</li>
-        <li>화면 모드는 <b>영화·필름메이커 모드</b>가 색과 밝기가 가장 안정적입니다.</li>
-        <li>60Hz 화면을 24fps로 찍을 때 롤링 줄이 보이면 셔터를 <b>1/60(144°)</b> 쪽으로 맞춰 보세요. 카메라 셔터를 바꿀 수 없으면 TV 쪽 백라이트 최대가 가장 효과가 큽니다.</li>
-      </ul>
-    </details>
+
+    <div class="pathrow" id="pathRow"></div>
+
+    <div class="minipad">
+      <button class="key" data-act="menu">설정</button>
+      <button class="key" data-act="up" data-repeat aria-label="위">▲</button>
+      <button class="key" data-act="back">뒤로</button>
+      <button class="key" data-act="left" data-repeat aria-label="왼쪽">◀</button>
+      <button class="key dpok" data-act="ok">확인</button>
+      <button class="key" data-act="right" data-repeat aria-label="오른쪽">▶</button>
+      <button class="key" data-act="home">홈</button>
+      <button class="key" data-act="down" data-repeat aria-label="아래">▼</button>
+      <button class="key" data-act="exit">나가기</button>
+    </div>
+
+    <button class="tiplink" id="tipBtn">카메라 플리커 줄이는 법</button>
   </section>
 
   <!-- TV 설정 -->
@@ -920,19 +922,21 @@ const ui = {
     if (recording) $('#recText').textContent = `녹화 중 · ${recording.steps.length}단계`;
   },
   renderMacros() {
-    const box = $('#macroList'); const d = dongles.get(current);
-    if (!d) { box.innerHTML = '<div class="empty">TV를 먼저 선택해 주세요.</div>'; return; }
-    const macros = cfgOf(d.id).macros;
-    if (!macros.length) { box.innerHTML = '<div class="empty">아직 매크로가 없어요. ‘● 녹화’를 누르고 리모컨 버튼을 순서대로 눌러 보세요.</div>'; return; }
-    box.innerHTML = '';
-    macros.forEach((mac, i) => {
-      const row = document.createElement('div'); row.className = 'macro';
-      row.innerHTML = `<div class="nm">${esc(mac.name)}<small>${mac.steps.map(s => ACTIONS[s.act] ? ACTIONS[s.act].label : s.act).join(' → ')}</small></div>
-        <button class="btn sm danger" data-del>삭제</button><button class="btn sm primary" data-run>실행</button>`;
-      $('[data-run]', row).onclick = () => playMacro(mac);
-      $('[data-del]', row).onclick = () => { macros.splice(i, 1); save(); this.renderMacros(); };
-      box.appendChild(row);
-    });
+    const box = $('#pathRow'); if (!box) return;
+    const d = dongles.get(current), pt = store.picTarget || 'bright', name = pt === 'bright' ? '밝기' : '명암';
+    if (!d) { box.className = 'pathrow'; box.innerHTML = '<span class="grow">TV를 먼저 선택해 주세요.</span>'; return; }
+    const path = (cfgOf(d.id).paths || {})[pt];
+    if (recording && recording.target) {
+      box.className = 'pathrow todo';
+      box.innerHTML = `<span class="grow">아래 버튼으로 TV의 <b>${name}</b> 조절 칸까지 이동하세요<small>도착하면 위쪽 ‘여기서 저장’을 누르세요</small></span>`;
+    } else if (path && path.length) {
+      box.className = 'pathrow';
+      box.innerHTML = `<span class="grow">${name} 메뉴 길 저장됨 · ${path.length}단계<small>+/−를 누르면 자동으로 ${name} 칸을 열어요</small></span><button class="btn sm" id="pathRec">다시 저장</button>`;
+    } else {
+      box.className = 'pathrow todo';
+      box.innerHTML = `<span class="grow"><b>처음 한 번:</b> ${name} 메뉴까지 가는 길 저장<small>TV마다 메뉴가 달라서 한 번만 알려 주면 돼요</small></span><button class="btn sm primary" id="pathRec">저장 시작</button>`;
+    }
+    const b = $('#pathRec'); if (b) b.onclick = () => startPathRec(pt);
   },
   renderPhoneSettings(body, d) {
     let bonded = [];
@@ -1552,35 +1556,56 @@ function bindTouchpad() {
   syncLive();
 }
 
+let picOpenAt = 0;   // 마지막으로 밝기 칸을 조작한 시각 (최근이면 메뉴가 열려 있다고 봄)
+function startPathRec(target) {
+  if (!dongles.get(current)) { ui.toast('TV를 먼저 선택해 주세요.'); return; }
+  recording = { steps: [], last: Date.now(), target }; ui.renderRec(); ui.renderMacros();
+  ui.toast('아래 버튼으로 메뉴를 이동하세요. 설정 버튼부터 시작해요.');
+}
+async function runPath(steps) {
+  for (const s of steps) { await sleep(Math.max(250, Math.min(s.wait || 0, 1200))); runAction(s.act, { fromMacro: true }); }
+  await sleep(400);
+}
 function bindPicture() {
-  const setMult = (n) => { store.mult = n; save(); $$('#multBtns button').forEach(b => b.classList.toggle('primary', +b.dataset.n === n)); };
-  setMult(store.mult || 5);
+  store.picTarget = store.picTarget || 'bright';
+  const syncTarget = () => { $$('#picTarget button').forEach(b => b.setAttribute('aria-pressed', b.dataset.pt === store.picTarget)); ui.renderMacros(); };
+  $$('#picTarget button').forEach(b => b.onclick = () => { store.picTarget = b.dataset.pt; save(); picOpenAt = 0; syncTarget(); });
+  const setMult = (n) => { store.mult = n; save(); $$('#multBtns button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.n === n)); };
+  setMult([1, 5, 10].includes(store.mult) ? store.mult : 5);
   $$('#multBtns button').forEach(b => b.onclick = () => setMult(+b.dataset.n));
-  const steps = async (act) => { for (let i = 0; i < store.mult; i++) { runAction(act); await sleep(130); } };
-  $('#stepDown').onclick = () => steps('left');
-  $('#stepUp').onclick = () => steps('right');
-  $('#recStart').onclick = () => {
-    if (!dongles.get(current)) { ui.toast('TV를 먼저 선택해 주세요.'); return; }
-    recording = { steps: [], last: Date.now() }; ui.renderRec(); switchTab('remote');
-    ui.toast('버튼을 순서대로 누른 뒤 ‘끝내기’를 누르세요');
+  let busy = false;
+  const adjust = async (act) => {
+    if (busy) return;
+    const d = dongles.get(current); if (!d) { ui.toast('TV를 먼저 선택해 주세요.'); return; }
+    busy = true;
+    try {
+      const path = (cfgOf(d.id).paths || {})[store.picTarget];
+      if (path && path.length && Date.now() - picOpenAt > 20000) { ui.toast('조절 칸을 여는 중…'); await runPath(path); }
+      for (let i = 0; i < store.mult; i++) { runAction(act, { fromMacro: true }); await sleep(120); }
+      picOpenAt = Date.now();
+    } finally { busy = false; }
   };
-  $('#recCancel').onclick = () => { recording = null; ui.renderRec(); };
+  $('#adjDown').onclick = () => adjust('left');
+  $('#adjUp').onclick = () => adjust('right');
+  $('#adjClose').onclick = async () => { picOpenAt = 0; runAction('exit', { fromMacro: true }); };
+  $('#recCancel').onclick = () => { recording = null; ui.renderRec(); ui.renderMacros(); };
   $('#recStop').onclick = () => {
     const rec = recording; recording = null; ui.renderRec();
-    if (!rec.steps.length) { ui.toast('녹화된 버튼이 없어요.'); return; }
-    openSheet(`<h3>매크로 이름</h3><input type="text" id="macName" placeholder="예: 밝기 메뉴로" value="">
-      <p style="margin:0;color:var(--muted);font-size:13px">${rec.steps.map(s => ACTIONS[s.act] ? ACTIONS[s.act].label : s.act).join(' → ')}</p>
-      <div class="row"><button class="btn grow" data-x>버리기</button><button class="btn primary grow" data-ok>저장</button></div>`,
-      (s, close) => {
-        $('#macName', s).focus();
-        $('[data-x]', s).onclick = close;
-        $('[data-ok]', s).onclick = () => {
-          const name = $('#macName', s).value.trim() || `매크로 ${cfgOf(current).macros.length + 1}`;
-          cfgOf(current).macros.push({ name, steps: rec.steps }); save(); close();
-          switchTab('pic'); ui.renderMacros(); ui.toast(`‘${name}’ 저장됨`);
-        };
-      });
+    if (!rec || !rec.steps.length) { ui.toast('누른 버튼이 없어요.'); ui.renderMacros(); return; }
+    const c = cfgOf(current); c.paths = c.paths || {};
+    c.paths[rec.target] = rec.steps; save();
+    picOpenAt = Date.now();   // 지금 그 칸에 있음
+    ui.renderMacros(); ui.toast(`${rec.target === 'bright' ? '밝기' : '명암'} 메뉴 길을 저장했어요. 이제 +/−만 누르면 돼요.`);
   };
+  $('#tipBtn').onclick = () => openSheet(`<h3>카메라 플리커 줄이는 법</h3>
+    <ul class="tips">
+      <li><b>밝기(백라이트)는 높게</b> 두고, 너무 밝으면 <b>명암</b>으로 낮추세요. 백라이트를 낮추면 깜빡임(PWM)이 생기는 TV가 많아요.</li>
+      <li>그래도 밝으면 화면에 <b>ND 필름</b>을 붙이거나 소품 이미지를 어둡게 만드세요.</li>
+      <li><b>절전·에코 모드, 자동 밝기, 동작 보정</b>은 끄세요.</li>
+      <li>화면 모드는 <b>영화·필름메이커 모드</b>가 가장 안정적이에요.</li>
+      <li>24fps에서 줄이 보이면 셔터를 <b>1/60(144°)</b> 쪽으로 맞춰 보세요.</li>
+    </ul><button class="btn" data-x>닫기</button>`, (s, close) => { $('[data-x]', s).onclick = close; });
+  syncTarget();
 }
 
 /* ---------------- 클리커 ---------------- */
