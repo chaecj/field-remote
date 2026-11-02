@@ -37,6 +37,11 @@ public final class Bridge {
     // 볼륨 버튼 클리커 / 화면
     @JavascriptInterface public void setVolumeConfig(String json) { Hub.setVolumeConfig(json); }
     @JavascriptInterface public void keepScreenOn(boolean on) { act.keepScreenOn(on); }
+    // 앱 업데이트
+    @JavascriptInterface public void checkUpdate() { Updater.check(act); }
+    @JavascriptInterface public void installUpdate(String url) { Updater.install(act, url); }
+    @JavascriptInterface public long versionCode() { return Updater.versionCode(act); }
+
     @JavascriptInterface public String appVersion() {
         try { return act.getPackageManager().getPackageInfo(act.getPackageName(), 0).versionName; } catch (Exception e) { return ""; }
     }

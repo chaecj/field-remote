@@ -10,8 +10,10 @@ android {
         applicationId 'kr.chaeum.fieldremote'
         minSdk 28
         targetSdk 34
-        versionCode 1
-        versionName '1.0'
+        // GitHub 빌드 번호를 버전으로 사용 (앱 안 업데이트가 새 버전을 알아보는 기준)
+        def buildNo = (System.getenv('BUILD_NUMBER') ?: '1') as Integer
+        versionCode buildNo
+        versionName "1.${buildNo}"
     }
 
     // 항상 같은 서명키로 빌드해서, 새 버전을 설치해도 저장된 TV·매크로가 지워지지 않게 함

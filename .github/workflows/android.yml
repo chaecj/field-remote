@@ -33,6 +33,8 @@ jobs:
 
       - name: APK 빌드
         working-directory: tv-remote/android
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
         run: gradle assembleRelease --no-daemon
 
       - name: 파일 이름 정리
