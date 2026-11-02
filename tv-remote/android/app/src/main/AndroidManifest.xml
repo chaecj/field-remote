@@ -36,6 +36,18 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- NFC 카드·링크: 앱이 있으면 앱이 열리고, 없으면 브라우저가 최신 APK를 내려받음 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="github.com" android:pathPrefix="/chaecj/field-remote/releases/latest" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="https" android:host="github.com" android:pathPrefix="/chaecj/field-remote/releases/latest" />
+            </intent-filter>
         </activity>
 
         <service
