@@ -26,6 +26,11 @@
 - **펌웨어**: `.ino` 수정 → 컴파일 → `TVRemoteDongle.app.bin`과 `latest.json`(version, size, sha256, url) 갱신 → push. `FW_VERSION`을 올려야 앱이 새 버전으로 인식한다. 앱의 TV 설정 탭에서 무선 업데이트.
   - 컴파일: `arduino-cli compile --fqbn "esp32:esp32:m5stack_atoms3:USBMode=default,CDCOnBoot=default" --export-binaries`
   - USB Mode는 반드시 **USB-OTG (TinyUSB)** (`USBMode=default`).
+- **main에 합치기 (사용자와 정한 규칙)**
+  - 앱·문서 변경: 확인(`node --check`, 가능하면 데모 TV로 동작 확인)을 마치면 **묻지 않고** PR을 만들어 바로 main에 합친다. 합친 뒤 APK 빌드가 시작됐는지 확인하고 알려 준다.
+  - **펌웨어 변경(`tv-remote/firmware/**`)은 예외**: 컴파일까지 마친 뒤 사용자에게 먼저 묻고 합친다. 동글 업데이트가 잘못되면 PC로 다시 구워야 해서다.
+  - 확인에 실패했거나 사용자의 의도가 애매하면 합치지 말고 먼저 묻는다.
+  - 안드로이드는 낮은 버전으로 되돌릴 수 없으니, 문제가 생기면 고친 버전을 새로 올린다.
 - 서명키 `tv-remote/android/app/fieldremote.keystore`는 바꾸지 않는다. 바꾸면 기존 앱 위에 업데이트가 안 된다.
 
 ## 동글 통신 (BLE)
