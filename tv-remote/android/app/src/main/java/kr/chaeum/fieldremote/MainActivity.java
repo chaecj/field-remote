@@ -29,11 +29,13 @@ public class MainActivity extends Activity {
     private final List<Runnable> afterBluetooth = new ArrayList<>();
     private boolean asking = false;
     ScreenShare share;
+    static MainActivity current;   // 앱 완전히 끄기에서 화면을 닫을 때 씀
     private boolean userKeepOn = false, shareKeepOn = false;
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        current = this;
         Hub.init(this);
 
         Window w = getWindow();
@@ -73,6 +75,7 @@ public class MainActivity extends Activity {
 
     @Override protected void onDestroy() {
         Hub.setSink(null);
+        if (current == this) current = null;
         if (share != null) { share.stop(); share = null; }
         if (web != null) { web.destroy(); web = null; }
         super.onDestroy();

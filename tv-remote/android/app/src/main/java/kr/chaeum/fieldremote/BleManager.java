@@ -130,6 +130,12 @@ public final class BleManager {
         c.gatt = null;
     }
 
+    /** 모든 동글 연결을 끊고 다시 붙지 않게 (앱 완전히 끄기) */
+    void disconnectAll() {
+        for (String addr : new java.util.ArrayList<>(conns.keySet())) disconnect(addr);
+        stopScan();
+    }
+
     private void scheduleRetry(Conn c) {
         if (!c.wanted) return;
         long delay = Math.min(30000, 1500L * (1 + c.retries));

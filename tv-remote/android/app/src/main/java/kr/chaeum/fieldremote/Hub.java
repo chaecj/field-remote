@@ -32,6 +32,18 @@ public final class Hub {
 
     public static void setSink(Sink s) { sink = s; }
 
+    /** 앱 완전히 끄기: 동글·휴대폰 키보드 연결을 모두 끊고, 연결 유지 서비스와 화면을 닫음 */
+    public static void quitAll(Context c) {
+        main.post(() -> {
+            try { if (ble != null) ble.disconnectAll(); } catch (Exception ignored) {}
+            try { if (hid != null) hid.stop(); } catch (Exception ignored) {}
+            volumeConfig = null;
+            RemoteService.stop(c);
+            MainActivity a = MainActivity.current;
+            if (a != null) a.finishAndRemoveTask();
+        });
+    }
+
     /** window.__native.<fn>(args...) 호출 */
     public static void emit(String fn, Object... args) {
         StringBuilder sb = new StringBuilder("window.__native&&window.__native.").append(fn).append("(");

@@ -21,6 +21,7 @@ public final class Bridge {
     @JavascriptInterface public void stopScan() { Hub.ble.stopScan(); }
     @JavascriptInterface public void connect(String addr) { act.withBluetooth(() -> Hub.ble.connect(addr)); }
     @JavascriptInterface public void disconnect(String addr) { Hub.ble.disconnect(addr); }
+    @JavascriptInterface public void quit() { Hub.quitAll(act); }
     @JavascriptInterface public void write(String addr, String b64, boolean reliable) {
         Hub.ble.write(addr, Base64.decode(b64, Base64.DEFAULT), reliable);
     }

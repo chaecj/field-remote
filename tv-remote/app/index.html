@@ -485,6 +485,7 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
       <div class="row"><span class="grow">화면 꺼짐 방지</span><button class="toggle" id="wakeBtn" aria-pressed="false">끔</button></div>
       <div class="row"><button class="btn grow" id="addBtn2">동글 추가</button><button class="btn grow" id="demoBtn">데모 TV 추가</button></div>
       <button class="btn" id="phoneKbBtn" hidden>이 휴대폰을 블루투스 키보드로 쓰기</button>
+      <div class="row" id="quitRow" hidden><span class="grow hint">앱을 닫아도 동글 연결은 계속 유지돼요. 연결을 모두 끊고 끄려면</span><button class="btn sm danger" id="quitBtn">앱 완전히 끄기</button></div>
       <div class="row" id="updRow" hidden><span class="grow hint" id="verText"></span><button class="btn sm" id="updCheck">업데이트 확인</button></div>
     </div>
   </section>
@@ -913,7 +914,7 @@ const ui = {
       b.innerHTML = `<span class="dot ${d.state}"></span><span class="nm">${esc(this.name(d))}</span>` +
         (d.state === 'on' ? `<span class="pill ${d.usb || d.bt ? 'ok' : ''}">${linkLabel(d)}</span>` : '');
       b.onclick = () => {
-        if (d.state === 'offline' && !d.demo && !d.phone) { d.retries = 0; d.connect().catch(e => ui.toast('연결하지 못했어요. 동글 전원과 거리를 확인해 주세요.')); }
+        if (d.state === 'offline' && !d.demo && !d.phone) { const cc = cfgOf(d.id); if (cc.off) { cc.off = false; save(); } d.retries = 0; d.connect().catch(e => ui.toast('연결하지 못했어요. 동글 전원과 거리를 확인해 주세요.')); }
         if (groupMode) { selected.has(d.id) ? selected.delete(d.id) : selected.add(d.id); current = d.id; }
         else current = d.id;
         ui.render();
@@ -1003,6 +1004,8 @@ const ui = {
       <div class="card">
         <div class="row"><span class="dot ${d.state}"></span><h2 class="grow">${esc(this.name(d))}</h2>
           ${d.demo ? '' : `<button class="btn sm" id="identBtn">동글 LED 깜빡이기</button>`}</div>
+        ${d.demo ? '' : `<div class="row"><span class="grow hint">${c.off ? '연결을 끊어 둔 동글이에요. 다시 연결할 때까지 붙지 않아요.' : '이 동글을 안 쓸 때는 연결을 끊어 두세요.'}</span>
+          <button class="btn sm${c.off ? ' primary' : ''}" id="linkBtn">${c.off ? '다시 연결' : '연결 끊기'}</button></div>`}
         <dl class="kv">
           <dt>연결</dt><dd>${d.state === 'on' ? '연결됨' : d.state === 'wait' ? '연결 중' : '끊김'}</dd>
           <dt>USB</dt><dd>${d.usb ? (d.usbSleep ? '인식됨 · TV가 USB 절전 중 (누르면 깨워서 보냄)' : '키보드·마우스로 인식됨') : '인식 안 됨 (꽂은 기기 전원·포트 확인)'}</dd>
@@ -1077,7 +1080,13 @@ const ui = {
       if (!nm) { this.toast('동글 이름은 영문·숫자로만 저장돼요 (최대 20자).'); return; }
       d.write([OP.SET_NAME, ...enc.encode(nm.slice(0, 20))], true).then(() => this.toast('동글이 새 이름으로 다시 시작해요')).catch(() => this.toast('연결된 상태에서만 할 수 있어요.'));
     };
+    const lb = $('#linkBtn'); if (lb) lb.onclick = () => {
+      if (c.off) { c.off = false; save(); d.retries = 0; d.connect().catch(() => {}); this.toast('다시 연결하는 중…'); }
+      else { c.off = true; save(); unlinkDongle(d); this.toast('연결을 끊었어요. 앱을 다시 켜도 자동으로 붙지 않아요.'); }
+      this.render();
+    };
     $('#forgetBtn').onclick = () => confirmSheet(`‘${this.name(d)}’를 목록에서 지울까요?`, '이 TV에 저장한 브랜드·버튼·매크로도 함께 지워집니다.', '삭제', () => {
+      unlinkDongle(d);
       d.state = 'removed';
       if (d.device && d.device.gatt.connected) d.device.gatt.disconnect();
       if (d.device && d.device.forget) d.device.forget().catch(() => {});
@@ -1261,12 +1270,17 @@ function addPhoneKb() {
     else if (d.state === 'wait') ui.toast('키보드 준비 완료. 이제 ‘이 휴대폰 찾기 허용’을 누르세요.');
   }, 4000);
 }
+// 동글 연결 끊기 (다시 붙으려 하지 않게). 안드로이드 앱은 뒤에서 도는 연결까지 끊음
+function unlinkDongle(d) {
+  if (d.native) { try { Native.disconnect(d.id); } catch (e) {} d.state = 'offline'; d.usb = false; d.bt = 0; }
+  else if (d.device) { d.retries = 99; try { if (d.device.gatt.connected) d.device.gatt.disconnect(); } catch (e) {} d.state = 'offline'; }
+}
 function restoreNative() {
   for (const [id, c] of Object.entries(store.tvs)) {
     if (!c.native) continue;
     const d = new NativeDongle(id, c.name); dongles.set(id, d);
     if (!current) current = id;
-    d.connect();
+    if (!c.off) d.connect();   // '연결 끊기' 해 둔 동글은 저절로 붙지 않음
   }
   // 휴대폰 키보드 모드는 자동으로 켜지 않음 (다른 키보드 앱과 자리를 다투지 않게). 쓸 때 ‘다시 시도’로 켬
   if (store.phoneKb) { const d = new PhoneKeyboard(); dongles.set(d.id, d); if (!current) current = d.id; }
@@ -2009,6 +2023,8 @@ function init() {
   if (NATIVE) {
     $('#phoneKbBtn').hidden = false; $('#phoneKbBtn').onclick = addPhoneKb;
     $('#updRow').hidden = false;
+    $('#quitRow').hidden = false;
+    $('#quitBtn').onclick = () => confirmSheet('앱을 완전히 끌까요?', '모든 동글과 휴대폰 키보드 연결을 끊고 앱을 닫아요. 다음에 앱을 켜면 다시 연결돼요.', '끄기', () => { try { Native.quit(); } catch (e) {} });
     try { $('#verText').textContent = `지금 버전: HW 리모컨 ${Native.versionCode()}`; } catch (e) {}
     $('#updCheck').onclick = () => upd.check(true);
     $('#updGo').onclick = () => { if (upd.url) { upd.show('준비하는 중…', ''); Native.installUpdate(upd.url); } };

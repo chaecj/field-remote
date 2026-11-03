@@ -20,6 +20,7 @@ import android.os.IBinder;
  */
 public class RemoteService extends Service {
     private static final String CH = "connection";
+    static final String ACTION_QUIT = "kr.chaeum.fieldremote.QUIT";
     private static RemoteService instance;
     private static boolean wantVolume;
 
@@ -30,6 +31,10 @@ public class RemoteService extends Service {
         try {
             if (Build.VERSION.SDK_INT >= 26) c.startForegroundService(i); else c.startService(i);
         } catch (Exception ignored) {}
+    }
+
+    static void stop(Context c) {
+        try { c.stopService(new Intent(c, RemoteService.class)); } catch (Exception ignored) {}
     }
 
     static void setVolumeMode(Context c, boolean on) {
@@ -61,7 +66,11 @@ public class RemoteService extends Service {
         applyVolume();
     }
 
-    @Override public int onStartCommand(Intent intent, int flags, int startId) { return START_STICKY; }
+    @Override public int onStartCommand(Intent intent, int flags, int startId) {
+        // 알림의 '종료' 버튼
+        if (intent != null && ACTION_QUIT.equals(intent.getAction())) { Hub.quitAll(this); stopSelf(); return START_NOT_STICKY; }
+        return START_STICKY;
+    }
 
     @Override public IBinder onBind(Intent intent) { return null; }
 
@@ -75,6 +84,9 @@ public class RemoteService extends Service {
         Intent open = new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pi = PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         Notification.Builder b = new Notification.Builder(this, CH);
+        PendingIntent quit = PendingIntent.getService(this, 1, new Intent(this, RemoteService.class).setAction(ACTION_QUIT),
+            PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        b.addAction(new Notification.Action.Builder(null, "종료 (연결 모두 끊기)", quit).build());
         return b.setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
             .setContentTitle("HW 리모컨")
             .setContentText(wantVolume ? "연결 유지 중 · 볼륨 버튼으로 넘기기 켬" : "동글 연결 유지 중")
