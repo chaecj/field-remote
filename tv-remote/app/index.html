@@ -308,8 +308,8 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
   .clk-view > .clicker { grid-row: 1 / span 5; height: calc(100vh - 220px); max-height: none; min-height: 200px; }
 
   /* 화면 공유: 왼쪽 = 연결·조작, 오른쪽 = 파일 목록 */
-  .share-view > #shareStat, .share-view > .sharenow, .share-view > .sharectl, .share-view > .vidctl, .share-view > .shopts, .share-view > .volrow { grid-column: 1; }
-  .share-view > .shlist { grid-row: 1 / span 7; }
+  .share-view > #shareStat, .share-view > .sharenow, .share-view > .sharectl, .share-view > .vidctl, .share-view > .shopts { grid-column: 1; }
+  .share-view > .shlist { grid-row: 1 / span 6; }
 
   /* TV 설정: 카드 2열 */
   #v-set { grid-template-columns: 1fr; }
@@ -459,14 +459,10 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
       <span class="label">TV 화면에 맞추기</span>
       <div class="seg two" id="shFit"><button data-fit="0">맞춤 (여백 생김)</button><button data-fit="1">꽉 채움 (잘릴 수 있음)</button></div>
     </div>
-    <div class="volrow">
-      <span class="grow">볼륨 버튼으로 넘기기<small>이 탭에서 아래 = 다음 · 위 = 이전</small></span>
-      <button class="toggle" id="shVol" aria-pressed="false">끔</button>
-    </div>
     <div class="shlist grid" style="gap:10px">
       <div class="row"><button class="btn primary grow" id="shAdd">+ 파일 추가</button><button class="btn" id="shEdit">편집</button></div>
       <div class="sharegrid" id="shareList"></div>
-      <p class="hint">사진·영상·PDF를 띄울 수 있어요. PPT는 PDF로 저장해서 추가하세요.</p>
+      <p class="hint">사진·영상·PDF·HTML을 띄울 수 있어요. HTML은 TV 해상도를 화면 폭으로 그려요. PPT는 PDF로 저장해서 추가하세요.</p>
     </div>
   </section>
 
@@ -1271,8 +1267,6 @@ function pushVolumeConfig() {
   if (!NATIVE) return;
   const st = store.clk || {};
   try {
-    // 화면 공유 탭에서 '볼륨 버튼으로 넘기기'가 켜져 있으면 볼륨 키를 화면 공유가 씀
-    if (shareVolActive()) { Native.setVolumeConfig(JSON.stringify({ next: [], prev: [], swap: false })); return; }
     if (!st.volume) { Native.setVolumeConfig(''); return; }
     const mk = (dir) => targets().map(d => ({ id: d.id, pk: clickerPackets(d, dir).map(p => [b64(p.b), p.r]) }));
     Native.setVolumeConfig(JSON.stringify({ next: mk(1), prev: mk(-1), swap: !!st.swap }));
@@ -1301,7 +1295,7 @@ window.__native = {
     d.logs = (d.logs || []).concat(t + '  ' + msg).slice(-12);
     if (current === d.id) ui.renderSettings();
   },
-  onVolumeKey(dir) { if (shareVolActive()) share.step(dir); else if (window.__clk) window.__clk.count(dir); },
+  onVolumeKey(dir) { if (window.__clk) window.__clk.count(dir); },
   onShare(j) { share.onState(j); },
   onShareItems(j) { try { share.add(JSON.parse(j)); } catch (e) {} },
   onUpdate(state, latest, cur, name, url) { upd.onResult(state, latest, cur, name, url); },
@@ -1646,7 +1640,7 @@ var share = {
   edit: false,
   get s() {
     // 같은 객체를 계속 씀 (빠진 값만 채움)
-    const d = { items: [], cur: -1, page: 0, fill: false, loop: true, mute: false, vol: false };
+    const d = { items: [], cur: -1, page: 0, fill: false, loop: true, mute: false };
     const o = store.share || (store.share = {});
     for (const k in d) if (!(k in o)) o[k] = d[k];
     return o;
@@ -1674,14 +1668,14 @@ var share = {
     const s = this.s; let added = 0, ppt = 0, other = 0;
     for (const it of list) {
       if (it.type === 'ppt') { ppt++; try { Native.shareForget(it.uri); } catch (e) {} continue; }
-      if (!['image', 'video', 'pdf'].includes(it.type)) { other++; try { Native.shareForget(it.uri); } catch (e) {} continue; }
+      if (!['image', 'video', 'pdf', 'html'].includes(it.type)) { other++; try { Native.shareForget(it.uri); } catch (e) {} continue; }
       if (s.items.some(x => x.uri === it.uri)) continue;
       s.items.push({ uri: it.uri, name: it.name || '파일', type: it.type, pages: it.pages || 0, dur: it.dur || 0, thumb: it.thumb || '' });
       added++;
     }
     save(); this.render();
     if (ppt) this.pptHelp();
-    else if (other) ui.toast('이미지·영상·PDF만 띄울 수 있어요.');
+    else if (other) ui.toast('사진·영상·PDF·HTML만 띄울 수 있어요.');
     else if (added) ui.toast(`${added}개를 추가했어요`);
   },
   remove(i) {
@@ -1706,6 +1700,7 @@ var share = {
   badge(it) {
     if (it.type === 'video') return '영상' + (it.dur ? ' ' + this.fmt(it.dur) : '');
     if (it.type === 'pdf') return `PDF ${it.pages || '?'}장`;
+    if (it.type === 'html') return 'HTML';
     return '사진';
   },
   onState(j) {
@@ -1750,14 +1745,13 @@ var share = {
     $('#shMute').setAttribute('aria-pressed', !!s.mute);
     $('#shMute').textContent = s.mute ? '소리 켜기' : '소리 끄기';
     $$('#shFit button').forEach(b => b.setAttribute('aria-pressed', (b.dataset.fit === '1') === !!s.fill));
-    $('#shVol').setAttribute('aria-pressed', !!s.vol); $('#shVol').textContent = s.vol ? '켬' : '끔';
     $('#shEdit').textContent = this.edit ? '완료' : '편집';
     $('#shEdit').hidden = !s.items.length;
     // 파일 목록
     const list = $('#shareList');
-    if (!s.items.length) { list.innerHTML = '<div class="empty">아직 파일이 없어요. ‘파일 추가’로 사진·영상·PDF를 고르세요.</div>'; return; }
+    if (!s.items.length) { list.innerHTML = '<div class="empty">아직 파일이 없어요. ‘파일 추가’로 사진·영상·PDF·HTML을 고르세요.</div>'; return; }
     list.innerHTML = s.items.map((x, i) => `<button class="shitem${i === s.cur && !st.black ? ' on' : ''}${this.edit ? ' edit' : ''}" data-i="${i}">
-        <span class="th">${x.thumb ? `<img src="${x.thumb}" alt="">` : `<span class="ic">${x.type === 'video' ? '▶' : x.type === 'pdf' ? 'PDF' : '🖼'}</span>`}${i === s.cur && !st.black ? '<span class="live">TV</span>' : ''}${this.edit ? '<span class="del" aria-label="지우기">×</span>' : ''}</span>
+        <span class="th">${x.thumb ? `<img src="${x.thumb}" alt="">` : `<span class="ic">${x.type === 'video' ? '▶' : x.type === 'pdf' ? 'PDF' : x.type === 'html' ? 'HTML' : '🖼'}</span>`}${i === s.cur && !st.black ? '<span class="live">TV</span>' : ''}${this.edit ? '<span class="del" aria-label="지우기">×</span>' : ''}</span>
         <span class="nm">${esc(x.name)}</span><span class="bd">${this.badge(x)}</span></button>`).join('');
     $$('#shareList .shitem').forEach(b => b.onclick = () => { const i = +b.dataset.i; this.edit ? this.remove(i) : this.show(i); });
   },
@@ -1778,7 +1772,6 @@ function bindShare() {
   $('#shLoop').onclick = () => { s.loop = !s.loop; save(); try { Native.shareLoop(s.loop); } catch (e) {} share.render(); };
   $('#shMute').onclick = () => { s.mute = !s.mute; save(); try { Native.shareMute(s.mute); } catch (e) {} share.render(); };
   $$('#shFit button').forEach(b => b.onclick = () => { s.fill = b.dataset.fit === '1'; save(); try { Native.shareFill(s.fill); } catch (e) {} share.render(); });
-  $('#shVol').onclick = () => { s.vol = !s.vol; save(); pushVolumeConfig(); share.render(); if (s.vol) ui.toast('화면 공유 탭에서 볼륨 아래 = 다음, 위 = 이전'); };
   if (NATIVE) {
     // 앱을 켤 때 TV는 검은 화면에서 시작 (지난번 파일을 저절로 띄우지 않음)
     s.cur = -1;
@@ -1786,7 +1779,6 @@ function bindShare() {
   }
   share.render();
 }
-function shareVolActive() { return NATIVE && !!share && !!share.s.vol && !$("#v-share").hidden; }
 
 /* ---------------- 클리커 ---------------- */
 // 키: [HID 키코드, 수식키]  수식키 비트: 1=Ctrl 2=Shift 4=Alt 8=Cmd/Win
@@ -1873,7 +1865,6 @@ function switchTab(name) {
   $$('nav.tabs [data-tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name));
   ['remote', 'pad', 'clk', 'share', 'set'].forEach(t => { $('#v-' + t).hidden = t !== name; });
   try { sessionStorage.setItem('fr.tab', name); } catch (e) {}
-  pushVolumeConfig();
   if (name === 'share') share.render();
 }
 

@@ -29,6 +29,9 @@ import android.view.TextureView;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 
@@ -36,6 +39,9 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.regex.Pattern;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -132,8 +138,44 @@ final class ScreenShare implements DisplayManager.DisplayListener {
         TextureView tex;
         ImageView img;
         View cover;
+        WebView web;   // HTML 파일용 (처음 쓸 때 만듦)
 
         TvScreen(Context c, Display d) { super(c, d); }
+
+        @android.annotation.SuppressLint("SetJavaScriptEnabled")
+        WebView web() {
+            if (web != null) return web;
+            WebView v = new WebView(getContext());
+            WebSettings ws = v.getSettings();
+            ws.setJavaScriptEnabled(true);
+            ws.setDomStorageEnabled(true);
+            ws.setMediaPlaybackRequiresUserGesture(false);
+            ws.setTextZoom(100);
+            // 페이지 폭을 TV 해상도(가로 픽셀)에 맞추고 화면에 꽉 맞게 축소·확대 → CSS 1px = TV 1픽셀
+            ws.setUseWideViewPort(true);
+            ws.setLoadWithOverviewMode(true);
+            ws.setSupportZoom(false);
+            ws.setBuiltInZoomControls(false);
+            v.setVerticalScrollBarEnabled(false);
+            v.setHorizontalScrollBarEnabled(false);
+            v.setWebViewClient(new WebViewClient());   // 링크를 눌러도 다른 앱(브라우저)이 뜨지 않게
+            v.setBackgroundColor(Color.WHITE);
+            v.setVisibility(View.GONE);
+            root.addView(v, root.indexOfChild(cover), new FrameLayout.LayoutParams(-1, -1));
+            web = v;
+            return v;
+        }
+
+        void hideWeb() {
+            if (web == null) return;
+            web.loadUrl("about:blank");   // 소리·애니메이션 멈춤
+            web.setVisibility(View.GONE);
+        }
+
+        @Override protected void onStop() {
+            if (web != null) { try { web.destroy(); } catch (Exception ignored) {} web = null; }
+            super.onStop();
+        }
 
         @SuppressWarnings("deprecation")
         @Override protected void onCreate(Bundle b) {
@@ -185,7 +227,12 @@ final class ScreenShare implements DisplayManager.DisplayListener {
         emit();
     }
 
-    void setFill(boolean on) { fill = on; if (uri != null && !"video".equals(type)) render(); else fitVideo(); emit(); }
+    void setFill(boolean on) {
+        fill = on;
+        if ("video".equals(type)) fitVideo();
+        else if (uri != null && !"html".equals(type)) render();   // HTML은 항상 TV 화면 전체
+        emit();
+    }
     void setLoop(boolean on) { loop = on; if (mp != null) mp.setLooping(on); emit(); }
     void setMute(boolean on) { muted = on; if (mp != null) mp.setVolume(on ? 0 : 1, on ? 0 : 1); emit(); }
 
@@ -208,16 +255,21 @@ final class ScreenShare implements DisplayManager.DisplayListener {
     private void render() {
         final int my = ++seq;
         applyCover();
-        if (screen == null || uri == null) { releaseVideo(); if (screen != null) { screen.img.setVisibility(View.GONE); screen.tex.setVisibility(View.GONE); } return; }
+        if (screen == null || uri == null) { releaseVideo(); if (screen != null) { screen.img.setVisibility(View.GONE); screen.tex.setVisibility(View.GONE); screen.hideWeb(); } return; }
         final Uri u = uri;
         final int W = dispW, H = dispH, pg = page;
         final boolean fl = fill;
+        if (!"html".equals(type)) screen.hideWeb();
         if ("video".equals(type)) { startVideo(u, my); return; }
         releaseVideo();
         screen.tex.setVisibility(View.GONE);
+        final String t = type;
         worker.execute(() -> {
             try {
-                if ("pdf".equals(type)) {
+                if ("html".equals(t)) {
+                    String html = withViewport(readText(u), W);
+                    Hub.main.post(() -> { if (my == seq && screen != null) showHtml(html); });
+                } else if ("pdf".equals(t)) {
                     Bitmap bm = renderPdf(u, pg, W, H, fl);
                     Hub.main.post(() -> { if (my == seq && screen != null) showImage(bm, null); });
                 } else {
@@ -230,6 +282,42 @@ final class ScreenShare implements DisplayManager.DisplayListener {
         });
     }
 
+    // ---------- HTML ----------
+    private void showHtml(String html) {
+        screen.img.setVisibility(View.GONE);
+        screen.img.setImageDrawable(null);
+        WebView v = screen.web();
+        v.loadDataWithBaseURL("https://localhost/", html, "text/html", "utf-8", null);
+        v.setVisibility(View.VISIBLE);
+    }
+
+    private String readText(Uri u) throws Exception {
+        try (InputStream in = act.getContentResolver().openInputStream(u)) {
+            if (in == null) throw new Exception("no stream");
+            ByteArrayOutputStream bo = new ByteArrayOutputStream();
+            byte[] buf = new byte[64 * 1024];
+            int n; long total = 0;
+            while ((n = in.read(buf)) > 0) {
+                total += n;
+                if (total > 80L * 1024 * 1024) throw new Exception("too big");
+                bo.write(buf, 0, n);
+            }
+            return new String(bo.toByteArray(), StandardCharsets.UTF_8);
+        }
+    }
+
+    private static final Pattern VIEWPORT = Pattern.compile("<meta[^>]*name\\s*=\\s*[\"']?viewport[\"']?[^>]*>", Pattern.CASE_INSENSITIVE);
+    private static final Pattern HEAD = Pattern.compile("<head[^>]*>", Pattern.CASE_INSENSITIVE);
+
+    // 페이지가 정한 화면 폭 설정을 TV 가로 픽셀 수로 바꿈 (예: 1920 → 1920×1080 화면으로 그려짐)
+    static String withViewport(String html, int w) {
+        String meta = "<meta name=\"viewport\" content=\"width=" + w + ", user-scalable=no\">";
+        String s = VIEWPORT.matcher(html).replaceAll("");
+        java.util.regex.Matcher m = HEAD.matcher(s);
+        if (m.find()) return s.substring(0, m.end()) + meta + s.substring(m.end());
+        return meta + s;
+    }
+
     private void showImage(Bitmap bm, Drawable dr) {
         ImageView v = screen.img;
         v.setScaleType(fill ? ImageView.ScaleType.CENTER_CROP : ImageView.ScaleType.FIT_CENTER);
@@ -240,6 +328,7 @@ final class ScreenShare implements DisplayManager.DisplayListener {
             a.start();
         }
         v.setVisibility(View.VISIBLE);
+        screen.hideWeb();
     }
 
     private Drawable decodeImage(Uri u, int W, int H) throws Exception {
@@ -368,7 +457,7 @@ final class ScreenShare implements DisplayManager.DisplayListener {
 
     // ---------- 파일 고르기 ----------
     static final String[] MIMES = {
-        "image/*", "video/*", "application/pdf",
+        "image/*", "video/*", "application/pdf", "text/html", "application/xhtml+xml",
         "application/vnd.ms-powerpoint",
         "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     };
@@ -419,6 +508,7 @@ final class ScreenShare implements DisplayManager.DisplayListener {
         if (mime.startsWith("image/")) t = "image";
         else if (mime.startsWith("video/")) t = "video";
         else if (mime.equals("application/pdf") || lower.endsWith(".pdf")) t = "pdf";
+        else if (mime.contains("html") || lower.endsWith(".html") || lower.endsWith(".htm")) t = "html";
         else if (mime.contains("powerpoint") || mime.contains("presentation") || lower.endsWith(".ppt") || lower.endsWith(".pptx")) t = "ppt";
         else t = "other";
         JSONObject j = new JSONObject();
