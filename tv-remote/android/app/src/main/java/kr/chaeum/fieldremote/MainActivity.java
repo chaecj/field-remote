@@ -65,6 +65,12 @@ public class MainActivity extends Activity {
         withBluetooth(() -> RemoteService.start(this));
     }
 
+    @Override protected void onResume() {
+        super.onResume();
+        // 앱으로 돌아오면 TV 화면이 닫혀 있는지 확인하고 다시 띄움
+        if (share != null) share.refresh();
+    }
+
     @Override protected void onDestroy() {
         Hub.setSink(null);
         if (share != null) { share.stop(); share = null; }
