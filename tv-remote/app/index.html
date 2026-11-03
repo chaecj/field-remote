@@ -1045,7 +1045,7 @@ const ui = {
           <dt>동글</dt><dd>${esc(d.devName)} · MTU ${d.mtu}</dd>
           ${d.demo ? '' : `<dt>펌웨어</dt><dd id="fwRow">${fw.rowHtml(d)}</dd>`}
           ${d.diag ? `<dt>진단</dt><dd>${esc(d.diag)}</dd>` : ''}
-          <dt>한/영 전환</dt><dd>${esc(HAN_KEYS[store.hanKey ?? 0][0])} <button class="btn sm" id="hanSetBtn">바꾸기</button></dd>
+          <dt>한/영 전환</dt><dd>${esc(HAN_KEYS[hanKeyOf(d.id)][0])} <button class="btn sm" id="hanSetBtn">바꾸기</button></dd>
           ${d.uc !== undefined ? `<dt>USB 방식</dt><dd>${d.uc ? '호환 모드 (키보드만)' : '표준 (키보드·마우스·미디어키)'} <button class="btn sm" id="ucBtn">${d.uc ? '표준으로' : '호환 모드로'}</button></dd>` : ''}
         </dl>
         <label class="label" for="nameIn">이 TV 이름</label>
@@ -1483,7 +1483,9 @@ function asciiKey(c) {
 }
 // [이름, 키코드, 수식키]  수식키: 1=Ctrl 2=Shift 4=Alt 8=Win
 const HAN_KEYS = [['한/영 키', 0x90, 0], ['오른쪽 Alt', 0xE6, 0], ['Shift + Space', 0x2C, 2], ['Ctrl + Space', 0x2C, 1], ['Win + Space', 0x2C, 8], ['Alt + Shift', 0xE1, 4]];
-function sendToggle(d, idx) { const [, k, m] = HAN_KEYS[idx ?? store.hanKey ?? 0]; d.write([OP.KEY_TAP, k, m], true); }
+// 한/영 전환 방법은 TV마다 다름 (예전에 하나로 저장한 값은 기본값으로 씀)
+const hanKeyOf = (id) => cfgOf(id).hanKey ?? store.hanKey ?? 0;
+function sendToggle(d, idx) { const [, k, m] = HAN_KEYS[idx ?? hanKeyOf(d.id)]; d.write([OP.KEY_TAP, k, m], true); }
 const JAMO_KEY = (() => {
   const plain = 'ㅂqㅈwㄷeㄱrㅅtㅛyㅕuㅑiㅐoㅔpㅁaㄴsㅇdㄹfㅎgㅗhㅓjㅏkㅣlㅋzㅌxㅊcㅍvㅠbㅜnㅡm';
   const shift = 'ㅃqㅉwㄸeㄲrㅆtㅒoㅖp';
@@ -1602,8 +1604,9 @@ function bindTouchpad() {
   // 한/영 전환은 치는 글자에 맞춰 자동. 가/A 버튼은 결과가 반대로 나올 때 맞추는 용도
   $('#hanBtn').onclick = flipHan;
   window.openHanSettings = () => {
-    const sel = store.hanKey ?? 0;
-    openSheet(`<h3>한/영 설정</h3>
+    const d0 = dongles.get(current); if (!d0) { ui.toast('TV를 먼저 선택해 주세요.'); return; }
+    const sel = hanKeyOf(d0.id);
+    openSheet(`<h3>${esc(ui.name(d0))} 한/영 설정</h3>
       <span class="label">전환 방법 (TV마다 한 번)</span>
       <p style="margin:0;color:var(--muted);font-size:13px">TV의 글자 입력 칸을 열고 하나씩 ‘시험’하세요. <b style="color:var(--fg)">안녕</b>이 나오면 맞는 방법이에요. <b style="color:var(--fg)">dkssud</b>가 나오면 다음 것을 시험하세요.</p>
       <div class="grid" style="gap:8px">${HAN_KEYS.map(([n], i) => `<div class="macro"><div class="nm">${esc(n)}${i === sel ? ' <span class="cur">사용 중</span>' : ''}</div>
@@ -1615,7 +1618,7 @@ function bindTouchpad() {
         for (const k of 'dkssud') d.write([OP.KEY_TAP, 0x04 + k.charCodeAt(0) - 97, 0], true);
         ui.toast('보냈어요. TV 입력 칸을 확인하세요.');
       }));
-      $$('[data-hu]', s).forEach(b => b.onclick = () => { store.hanKey = +b.dataset.hu; save(); close(); ui.render(); ui.toast(`한/영 전환: ${HAN_KEYS[+b.dataset.hu][0]}`); });
+      $$('[data-hu]', s).forEach(b => b.onclick = () => { cfgOf(d0.id).hanKey = +b.dataset.hu; save(); close(); ui.render(); ui.toast(`${ui.name(d0)} 한/영 전환: ${HAN_KEYS[+b.dataset.hu][0]}`); });
     });
   };
   $$('nav.tabs [data-tab="pad"]').forEach(b => b.addEventListener('click', renderHan));
