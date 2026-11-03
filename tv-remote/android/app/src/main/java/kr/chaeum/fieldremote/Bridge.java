@@ -46,6 +46,7 @@ public final class Bridge {
     @JavascriptInterface public void shareMute(boolean on) { onShare(s -> s.setMute(on)); }
     @JavascriptInterface public void shareVideo(String cmd) { onShare(s -> s.video(cmd)); }
     @JavascriptInterface public void shareClear() { onShare(ScreenShare::clear); }
+    @JavascriptInterface public void shareView(float z, float x, float y) { onShare(sh -> sh.setView(z, x, y)); }
     @JavascriptInterface public void shareForget(String uri) { onShare(s -> s.forget(uri)); }
     @JavascriptInterface public void shareState() { onShare(ScreenShare::emit); }
     @JavascriptInterface public boolean openCastSettings() { return act.openCastSettings(); }
