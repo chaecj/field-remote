@@ -112,14 +112,14 @@ header.top {
 .g3 { grid-template-columns: repeat(3, 1fr); }
 .g7 { grid-template-columns: repeat(7, 1fr); gap: 6px; }
 .g7 .key { min-height: 46px; border-radius: 11px; }
-.g5 { grid-template-columns: repeat(5, 1fr); gap: 6px; }
-.g5 .key { min-height: 46px; border-radius: 11px; font-size: 17px; font-weight: 600; }
 
 section.view { display: grid; gap: 16px; padding-top: 8px; }
 .label { font-size: 11.5px; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
 
 /* 리모컨 탭: 한 화면에 다 들어가게. 방향키 크기(--dp)를 화면 높이에 맞춤 */
-#v-remote { gap: 12px; --dp: clamp(150px, calc(100dvh - 590px), 236px); }
+#v-remote { gap: 12px; --dp: clamp(140px, calc(100dvh - 650px), 236px); --nk: clamp(38px, calc(100dvh / 19), 50px); }
+#v-remote #numpad { gap: 6px 8px; }
+#v-remote #numpad .key { min-height: var(--nk); font-size: 17px; }
 #v-remote .dpad { width: var(--dp); max-width: 100%; }
 #v-remote .rocker { height: calc(var(--dp) * 0.82); }
 
@@ -135,7 +135,7 @@ section.view { display: grid; gap: 16px; padding-top: 8px; }
 .dpad .dp-down { bottom: 4%; left: 34%; width: 32%; height: 28%; }
 .dpad .dp-left { left: 4%; top: 34%; width: 28%; height: 32%; }
 .dpad .dp-right { right: 4%; top: 34%; width: 28%; height: 32%; }
-.dpad .dp-ok { left: 31%; top: 31%; width: 38%; height: 38%; border-radius: 50%; background: var(--key); font-size: 15px; }
+.dpad .dp-ok { left: 31%; top: 31%; width: 38%; height: 38%; border-radius: 50%; background: var(--key); font-size: 15px; white-space: nowrap; }
 .dpad .dp-ok { background: var(--grad); color: var(--accent-ink); font-weight: 700; }
 .dpad .dp-ok:active, .dpad .dp-ok.pressed { background: var(--accent-2); }
 .rocker { display: grid; grid-template-rows: 1fr auto 1fr; background: linear-gradient(180deg, var(--key-hi), var(--key)); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06); border-radius: 32px; overflow: hidden; height: 180px; }
@@ -333,8 +333,24 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
 /* 높이가 낮은 가로 화면(휴대폰 가로)에서는 큰 버튼을 조금 줄임 */
 @media (orientation: landscape) and (max-height: 500px) {
   header.top { padding-block: 6px 4px; gap: 6px; }
-  #v-remote { --dp: clamp(120px, calc(100dvh - 255px), 210px); gap: 8px; }
-  #v-remote .key { min-height: 42px; }
+  /* 휴대폰 가로: 왼쪽 = 전원줄·방향키·뒤로줄, 오른쪽 = 숫자·재생줄 */
+  #v-remote { --dp: clamp(110px, calc(100dvh - 275px), 210px); gap: 8px; }
+  #v-remote .key { min-height: 40px; }
+  #v-remote #numpad .key { min-height: 34px; }
+  #v-remote > .g4:first-child { grid-column: 1; grid-row: 1; }
+  #v-remote > .pad-wrap { grid-column: 1; grid-row: 2; }
+  #v-remote > .rowb { grid-column: 1; grid-row: 3; }
+  #v-remote > #numpad { grid-column: 2; grid-row: 1 / span 2; align-content: start; }
+  #v-remote > .g7 { grid-column: 2; grid-row: 3; }
+  #v-remote > .log { display: none; }
+  #v-remote .dpad .dp-ok { font-size: 12.5px; }
+}
+/* 키가 작은 휴대폰(세로): 간격과 버튼 높이를 조금 줄여 숫자 패드까지 한 화면에 */
+@media (orientation: portrait) and (max-height: 820px) {
+  header.top { padding-block: 8px 6px; gap: 8px; }
+  #v-remote { gap: 8px; --dp: clamp(130px, calc(100dvh - 560px), 200px); }
+  #v-remote .g4 .key, #v-remote .rowb .key { min-height: 46px; }
+  #v-remote .g7 .key { min-height: 42px; }
 }
 </style>
 </head>
@@ -399,10 +415,11 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
       <button class="key" data-act="next" aria-label="다음"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 6v12l10-6z"/><rect x="17" y="6" width="2" height="12"/></svg></button>
     </div>
 
-    <!-- 숫자: 1~5 / 6~0 두 줄 (세로 스크롤이 생기지 않게) -->
-    <div class="grid g5" id="numpad">
-        <button class="key" data-act="d1">1</button><button class="key" data-act="d2">2</button><button class="key" data-act="d3">3</button><button class="key" data-act="d4">4</button><button class="key" data-act="d5">5</button>
-        <button class="key" data-act="d6">6</button><button class="key" data-act="d7">7</button><button class="key" data-act="d8">8</button><button class="key" data-act="d9">9</button><button class="key" data-act="d0">0</button>
+    <div class="grid g3" id="numpad">
+        <button class="key" data-act="d1">1</button><button class="key" data-act="d2">2</button><button class="key" data-act="d3">3</button>
+        <button class="key" data-act="d4">4</button><button class="key" data-act="d5">5</button><button class="key" data-act="d6">6</button>
+        <button class="key" data-act="d7">7</button><button class="key" data-act="d8">8</button><button class="key" data-act="d9">9</button>
+        <span></span><button class="key" data-act="d0">0</button><span></span>
     </div>
     <div class="log" id="log"></div>
   </section>
