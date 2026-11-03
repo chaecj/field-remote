@@ -29,6 +29,8 @@ import android.view.TextureView;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -42,6 +44,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -79,6 +83,24 @@ final class ScreenShare implements DisplayManager.DisplayListener {
     private Uri pdfUri;
 
     private String error = "";
+
+    // PPT: TV 화면의 WebView에서 pptx를 그림 (assets/pptx-render.js)
+    private String pptJs;                 // 그리기 라이브러리 (처음 한 번 읽음)
+    private volatile Uri webFile;         // https://pptx.local/file 로 넘겨줄 파일
+    private Uri webPpt;                   // 지금 WebView에 올라가 있는 PPT
+    private int slideCount = 0;
+    private final TvJs tvJs = new TvJs(this);
+    private final WebViewClient webClient = new WebViewClient() {
+        @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req) {
+            Uri url = req.getUrl();
+            Uri f = webFile;
+            if (f != null && "pptx.local".equals(url.getHost()) && "/file".equals(url.getPath())) {
+                try { return new WebResourceResponse("application/octet-stream", null, act.getContentResolver().openInputStream(f)); }
+                catch (Exception e) { return null; }
+            }
+            return null;
+        }
+    };
 
     ScreenShare(MainActivity a) {
         act = a;
@@ -118,6 +140,7 @@ final class ScreenShare implements DisplayManager.DisplayListener {
         releaseVideo();
         dismiss();
         dispId = d.getDisplayId(); dispW = w; dispH = h;
+        webPpt = null;
         TvScreen s = new TvScreen(act, d);
         try { s.show(); } catch (WindowManager.InvalidDisplayException | IllegalStateException e) { dispId = -1; emit(); return; }
         screen = s;
@@ -128,7 +151,7 @@ final class ScreenShare implements DisplayManager.DisplayListener {
 
     private void dismiss() {
         if (screen != null) { try { screen.dismiss(); } catch (Exception ignored) {} }
-        screen = null; dispId = -1;
+        screen = null; dispId = -1; webPpt = null;
         act.setShareKeepOn(false);
     }
 
@@ -230,7 +253,7 @@ final class ScreenShare implements DisplayManager.DisplayListener {
     void setFill(boolean on) {
         fill = on;
         if ("video".equals(type)) fitVideo();
-        else if (uri != null && !"html".equals(type)) render();   // HTML은 항상 TV 화면 전체
+        else if (uri != null && !"html".equals(type) && !"ppt".equals(type)) render();   // HTML·PPT는 항상 TV 화면 전체
         emit();
     }
     void setLoop(boolean on) { loop = on; if (mp != null) mp.setLooping(on); emit(); }
@@ -255,15 +278,26 @@ final class ScreenShare implements DisplayManager.DisplayListener {
     private void render() {
         final int my = ++seq;
         applyCover();
-        if (screen == null || uri == null) { releaseVideo(); if (screen != null) { screen.img.setVisibility(View.GONE); screen.tex.setVisibility(View.GONE); screen.hideWeb(); } return; }
+        if (screen == null || uri == null) { releaseVideo(); if (screen != null) { screen.img.setVisibility(View.GONE); screen.tex.setVisibility(View.GONE); hideWeb(); } return; }
         final Uri u = uri;
         final int W = dispW, H = dispH, pg = page;
         final boolean fl = fill;
-        if (!"html".equals(type)) screen.hideWeb();
+        if (!"html".equals(type) && !"ppt".equals(type)) hideWeb();
         if ("video".equals(type)) { startVideo(u, my); return; }
         releaseVideo();
         screen.tex.setVisibility(View.GONE);
         final String t = type;
+        if ("ppt".equals(t)) {
+            // 같은 PPT면 다시 읽지 않고 장만 바꿈
+            if (u.equals(webPpt) && screen.web != null) { screen.web.evaluateJavascript("showSlide(" + pg + ")", null); return; }
+            worker.execute(() -> {
+                try {
+                    String js = pptJs();
+                    Hub.main.post(() -> { if (my == seq && screen != null) showPpt(u, pg, W, H, js); });
+                } catch (Throwable e) { fail("PPT를 열 수 없어요."); }
+            });
+            return;
+        }
         worker.execute(() -> {
             try {
                 if ("html".equals(t)) {
@@ -282,11 +316,59 @@ final class ScreenShare implements DisplayManager.DisplayListener {
         });
     }
 
+    private void hideWeb() { if (screen != null) screen.hideWeb(); webPpt = null; }
+
+    // ---------- PPT ----------
+    private String pptJs() throws Exception {
+        if (pptJs != null) return pptJs;
+        try (InputStream in = act.getAssets().open("pptx-render.js")) {
+            ByteArrayOutputStream bo = new ByteArrayOutputStream();
+            byte[] buf = new byte[64 * 1024]; int n;
+            while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+            pptJs = new String(bo.toByteArray(), StandardCharsets.UTF_8);
+        }
+        return pptJs;
+    }
+
+    // 슬라이드를 TV 해상도(W×H) 그대로 그림. 슬라이드 비율이 다르면 가운데 두고 남는 곳은 검게
+    private void showPpt(Uri u, int pg, int W, int H, String js) {
+        screen.img.setVisibility(View.GONE);
+        screen.img.setImageDrawable(null);
+        webFile = u;
+        slideCount = 0;
+        WebView v = screen.web();
+        v.setWebViewClient(webClient);
+        v.addJavascriptInterface(tvJs, "TV");
+        String run = "var W=" + W + ",H=" + H + ",S=null,P=null;"
+            + "function load(){if(!P)P=fetch('https://pptx.local/file').then(function(r){if(!r.ok)throw new Error('파일 없음');return r.arrayBuffer()})"
+            + ".then(function(b){return pptxToHtml(b,{width:W,height:H,scaleToFit:true,letterbox:true})})"
+            + ".then(function(s){S=s;TV.slides(s.length);return s})"
+            + ".catch(function(e){TV.error(String(e&&e.message||e));return null});return P}"
+            + "function showSlide(i){load().then(function(s){if(!s||!s.length)return;i=Math.max(0,Math.min(i,s.length-1));document.getElementById('w').innerHTML=s[i]})}"
+            + "showSlide(" + pg + ");";
+        String html = "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=" + W + ", user-scalable=no\">"
+            + "<style>html,body{margin:0;width:" + W + "px;height:" + H + "px;overflow:hidden;background:#000;font-family:sans-serif}"
+            + "#w{position:absolute;left:0;top:0;width:" + W + "px;height:" + H + "px;overflow:hidden}</style></head>"
+            + "<body><div id=\"w\"></div><script>" + js + "</script><script>" + run + "</script></body></html>";
+        v.loadDataWithBaseURL("https://pptx.local/", html, "text/html", "utf-8", null);
+        v.setVisibility(View.VISIBLE);
+        webPpt = u;
+    }
+
+    void onSlides(int n) { slideCount = n; emit(); }
+
+    void onPptError(String msg) {
+        webPpt = null;
+        fail("PPT를 그리지 못했어요. PDF로 저장해서 올려 주세요.");
+    }
+
     // ---------- HTML ----------
     private void showHtml(String html) {
         screen.img.setVisibility(View.GONE);
         screen.img.setImageDrawable(null);
+        webPpt = null;
         WebView v = screen.web();
+        v.setWebViewClient(webClient);
         v.loadDataWithBaseURL("https://localhost/", html, "text/html", "utf-8", null);
         v.setVisibility(View.VISIBLE);
     }
@@ -328,7 +410,7 @@ final class ScreenShare implements DisplayManager.DisplayListener {
             a.start();
         }
         v.setVisibility(View.VISIBLE);
-        screen.hideWeb();
+        hideWeb();
     }
 
     private Drawable decodeImage(Uri u, int W, int H) throws Exception {
@@ -451,6 +533,7 @@ final class ScreenShare implements DisplayManager.DisplayListener {
             j.put("black", black); j.put("fill", fill); j.put("loop", loop); j.put("mute", muted);
             j.put("video", mp != null); j.put("playing", playing);
             j.put("err", error);
+            if ("ppt".equals(type)) j.put("slides", slideCount);
             Hub.emit("onShare", j.toString());
         } catch (Exception ignored) {}
     }
@@ -495,6 +578,17 @@ final class ScreenShare implements DisplayManager.DisplayListener {
         try { act.getContentResolver().releasePersistableUriPermission(Uri.parse(u), Intent.FLAG_GRANT_READ_URI_PERMISSION); } catch (Exception ignored) {}
     }
 
+    // pptx(zip) 안의 ppt/slides/slideN.xml 개수 = 장 수
+    private static final Pattern SLIDE = Pattern.compile("^ppt/slides/slide\\d+\\.xml$");
+    private static int countSlides(ContentResolver cr, Uri u) {
+        int n = 0;
+        try (InputStream in = cr.openInputStream(u); ZipInputStream z = new ZipInputStream(in)) {
+            ZipEntry e;
+            while ((e = z.getNextEntry()) != null) if (SLIDE.matcher(e.getName()).matches()) n++;
+        } catch (Exception ignored) {}
+        return n;
+    }
+
     private JSONObject describe(Uri u) throws Exception {
         ContentResolver cr = act.getContentResolver();
         String mime = cr.getType(u);
@@ -509,7 +603,8 @@ final class ScreenShare implements DisplayManager.DisplayListener {
         else if (mime.startsWith("video/")) t = "video";
         else if (mime.equals("application/pdf") || lower.endsWith(".pdf")) t = "pdf";
         else if (mime.contains("html") || lower.endsWith(".html") || lower.endsWith(".htm")) t = "html";
-        else if (mime.contains("powerpoint") || mime.contains("presentation") || lower.endsWith(".ppt") || lower.endsWith(".pptx")) t = "ppt";
+        else if (lower.endsWith(".ppt") || mime.equals("application/vnd.ms-powerpoint")) t = "pptold";   // 옛날 PPT 형식은 못 그림
+        else if (mime.contains("presentation") || lower.endsWith(".pptx")) t = "ppt";
         else t = "other";
         JSONObject j = new JSONObject();
         j.put("uri", u.toString()); j.put("name", name); j.put("type", t);
@@ -530,6 +625,8 @@ final class ScreenShare implements DisplayManager.DisplayListener {
                     if (dur != null) j.put("dur", Long.parseLong(dur));
                     th = r.getScaledFrameAtTime(1_000_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, 200, 200);
                 } finally { try { r.release(); } catch (Exception ignored) {} }
+            } else if (t.equals("ppt")) {
+                j.put("pages", countSlides(cr, u));
             } else if (t.equals("pdf")) {
                 try (ParcelFileDescriptor fd = cr.openFileDescriptor(u, "r"); PdfRenderer pr = new PdfRenderer(fd)) {
                     j.put("pages", pr.getPageCount());

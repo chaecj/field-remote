@@ -16,6 +16,7 @@
 | `tv-remote/app/index.html` | **화면 전체 (HTML/CSS/JS 한 파일)**. 대부분의 수정은 여기서 한다 |
 | `tv-remote/android/` | 안드로이드 앱 껍데기: WebView + 블루투스(BleManager), 휴대폰 키보드(HidKeyboard), 볼륨키 클리커·연결 유지(RemoteService), 앱 안 업데이트(Updater), 화면 공유(ScreenShare: 미러링·HDMI로 연결된 TV에 Presentation으로 파일만 표시), JS 브리지(Bridge → `window.Native`) |
 | `tv-remote/android/app/src/main/assets/index.html` | 빌드 때 `app/index.html`이 자동 복사됨. 직접 고치지 않는다 |
+| `tv-remote/android/app/src/main/assets/pptx-render.js` | 화면 공유에서 PPT(.pptx)를 TV 해상도로 그리는 라이브러리 묶음 (@jvmr/pptx-to-html 1.1.2 + jszip, MIT). 도형 글자색 버그 한 곳 수정. 만드는 법은 파일 맨 위 주석, 라이선스는 `pptx-render.LICENSE.txt` |
 | `tv-remote/firmware/TVRemoteDongle/TVRemoteDongle.ino` | 동글 펌웨어 (Arduino, ESP32 core 3.3.x) |
 | `tv-remote/firmware/TVRemoteDongle.merged.bin` | PC로 처음 굽는 통합 이미지 (주소 **0x0**) |
 | `tv-remote/firmware/TVRemoteDongle.app.bin`, `latest.json` | 무선(OTA) 펌웨어 업데이트용. 앱이 `latest.json`을 읽어 새 버전을 알림 |

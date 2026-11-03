@@ -462,7 +462,7 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
     <div class="shlist grid" style="gap:10px">
       <div class="row"><button class="btn primary grow" id="shAdd">+ 파일 추가</button><button class="btn" id="shEdit">편집</button></div>
       <div class="sharegrid" id="shareList"></div>
-      <p class="hint">사진·영상·PDF·HTML을 띄울 수 있어요. HTML은 TV 해상도를 화면 폭으로 그려요. PPT는 PDF로 저장해서 추가하세요.</p>
+      <p class="hint">사진·영상·PDF·HTML·PPT(.pptx)를 띄울 수 있어요. PPT는 휴대폰이 직접 그려서 글꼴·애니메이션이 원본과 다를 수 있어요. 모양이 꼭 같아야 하면 PDF로 저장해 쓰세요.</p>
     </div>
   </section>
 
@@ -1658,24 +1658,24 @@ var share = {
     const s = this.s, it = this.item();
     if (!s.items.length) return;
     if (!it || this.st.black && s.cur < 0) { this.show(0); return; }
-    if (it.type === 'pdf' && s.page + dir >= 0 && s.page + dir < (it.pages || 1)) { this.show(s.cur, s.page + dir); return; }
+    if ((it.type === 'pdf' || it.type === 'ppt') && s.page + dir >= 0 && s.page + dir < (it.pages || 1)) { this.show(s.cur, s.page + dir); return; }
     const n = s.cur + dir;
     if (n < 0 || n >= s.items.length) { ui.toast(dir > 0 ? '마지막이에요' : '처음이에요'); return; }
     const nx = s.items[n];
-    this.show(n, dir < 0 && nx.type === 'pdf' ? (nx.pages || 1) - 1 : 0);
+    this.show(n, dir < 0 && (nx.type === 'pdf' || nx.type === 'ppt') ? (nx.pages || 1) - 1 : 0);
   },
   add(list) {
     const s = this.s; let added = 0, ppt = 0, other = 0;
     for (const it of list) {
-      if (it.type === 'ppt') { ppt++; try { Native.shareForget(it.uri); } catch (e) {} continue; }
-      if (!['image', 'video', 'pdf', 'html'].includes(it.type)) { other++; try { Native.shareForget(it.uri); } catch (e) {} continue; }
+      if (it.type === 'pptold') { ppt++; try { Native.shareForget(it.uri); } catch (e) {} continue; }
+      if (!['image', 'video', 'pdf', 'html', 'ppt'].includes(it.type)) { other++; try { Native.shareForget(it.uri); } catch (e) {} continue; }
       if (s.items.some(x => x.uri === it.uri)) continue;
       s.items.push({ uri: it.uri, name: it.name || '파일', type: it.type, pages: it.pages || 0, dur: it.dur || 0, thumb: it.thumb || '' });
       added++;
     }
     save(); this.render();
     if (ppt) this.pptHelp();
-    else if (other) ui.toast('사진·영상·PDF·HTML만 띄울 수 있어요.');
+    else if (other) ui.toast('사진·영상·PDF·HTML·PPT만 띄울 수 있어요.');
     else if (added) ui.toast(`${added}개를 추가했어요`);
   },
   remove(i) {
@@ -1687,12 +1687,12 @@ var share = {
     save(); this.render();
   },
   pptHelp() {
-    openSheet(`<h3>PPT는 PDF로 저장해서 올려 주세요</h3>
-      <p style="margin:0;color:var(--muted)">휴대폰에서는 PPT를 그대로 그릴 수 없어요. PDF로 바꾸면 슬라이드 한 장씩 TV 해상도에 맞춰 띄울 수 있어요.</p>
+    openSheet(`<h3>옛날 PPT(.ppt)는 바로 띄울 수 없어요</h3>
+      <p style="margin:0;color:var(--muted)">.pptx나 PDF로 저장해서 추가하세요. 똑같은 모양이 꼭 필요하면 PDF가 가장 정확해요.</p>
       <ul class="tips">
-        <li><b>파워포인트 앱:</b> 파일 → 내보내기(또는 다른 이름으로 저장) → PDF</li>
-        <li><b>PC 파워포인트:</b> 파일 → 내보내기 → PDF 만들기</li>
-        <li><b>구글 슬라이드:</b> 더보기 → 공유 및 내보내기 → 다른 이름으로 저장 → PDF</li>
+        <li><b>PC 파워포인트:</b> 파일 → 다른 이름으로 저장 → PowerPoint 프레젠테이션(.pptx) 또는 PDF</li>
+        <li><b>파워포인트 앱:</b> 파일 → 내보내기 → PDF</li>
+        <li><b>구글 슬라이드:</b> 더보기 → 공유 및 내보내기 → 다른 이름으로 저장 → .pptx 또는 PDF</li>
       </ul>
       <button class="btn" data-x>닫기</button>`, (s, close) => { $('[data-x]', s).onclick = close; });
   },
@@ -1701,6 +1701,7 @@ var share = {
     if (it.type === 'video') return '영상' + (it.dur ? ' ' + this.fmt(it.dur) : '');
     if (it.type === 'pdf') return `PDF ${it.pages || '?'}장`;
     if (it.type === 'html') return 'HTML';
+    if (it.type === 'ppt') return `PPT ${it.pages || '?'}장`;
     return '사진';
   },
   onState(j) {
@@ -1708,6 +1709,9 @@ var share = {
     const was = !!this.st.disp;
     this.st = st;
     if (st.err) ui.toast(st.err);
+    // PPT는 TV에서 그린 뒤 실제 장 수를 알려 줌
+    const cur = this.item();
+    if (cur && cur.type === 'ppt' && st.slides > 0 && cur.pages !== st.slides) { cur.pages = st.slides; save(); }
     if (!was && st.disp) ui.toast('TV 화면이 연결됐어요. TV에는 고른 파일만 나와요.');
     if (was && !st.disp) ui.toast('TV 화면 연결이 끊겼어요.');
     this.render();
@@ -1736,7 +1740,7 @@ var share = {
     const now = $('#shareNow');
     if (!st.disp) now.innerHTML = '<span class="muted">TV 연결을 기다리는 중</span>';
     else if (st.black || !it) now.innerHTML = `<b>TV: 검은 화면</b>${it ? `<span class="muted"> · 다음: ${esc(it.name)}</span>` : ''}`;
-    else now.innerHTML = `<b>TV: ${esc(it.name)}</b>${it.type === 'pdf' ? ` <span class="pill">${s.page + 1} / ${it.pages}</span>` : ''}${it.type === 'video' ? ` <span class="pill">${st.playing ? '재생 중' : '멈춤'}</span>` : ''}`;
+    else now.innerHTML = `<b>TV: ${esc(it.name)}</b>${it.type === 'pdf' || it.type === 'ppt' ? ` <span class="pill">${s.page + 1} / ${it.pages || '?'}</span>` : ''}${it.type === 'video' ? ` <span class="pill">${st.playing ? '재생 중' : '멈춤'}</span>` : ''}`;
     $('#shBlack').setAttribute('aria-pressed', !!st.black);
     $('#shBlack').textContent = st.black ? '화면 보이기' : '검은 화면';
     $('#vidCtl').hidden = !(st.disp && it && it.type === 'video');
@@ -1749,9 +1753,9 @@ var share = {
     $('#shEdit').hidden = !s.items.length;
     // 파일 목록
     const list = $('#shareList');
-    if (!s.items.length) { list.innerHTML = '<div class="empty">아직 파일이 없어요. ‘파일 추가’로 사진·영상·PDF·HTML을 고르세요.</div>'; return; }
+    if (!s.items.length) { list.innerHTML = '<div class="empty">아직 파일이 없어요. ‘파일 추가’로 사진·영상·PDF·HTML·PPT를 고르세요.</div>'; return; }
     list.innerHTML = s.items.map((x, i) => `<button class="shitem${i === s.cur && !st.black ? ' on' : ''}${this.edit ? ' edit' : ''}" data-i="${i}">
-        <span class="th">${x.thumb ? `<img src="${x.thumb}" alt="">` : `<span class="ic">${x.type === 'video' ? '▶' : x.type === 'pdf' ? 'PDF' : x.type === 'html' ? 'HTML' : '🖼'}</span>`}${i === s.cur && !st.black ? '<span class="live">TV</span>' : ''}${this.edit ? '<span class="del" aria-label="지우기">×</span>' : ''}</span>
+        <span class="th">${x.thumb ? `<img src="${x.thumb}" alt="">` : `<span class="ic">${x.type === 'video' ? '▶' : x.type === 'pdf' ? 'PDF' : x.type === 'html' ? 'HTML' : x.type === 'ppt' ? 'PPT' : '🖼'}</span>`}${i === s.cur && !st.black ? '<span class="live">TV</span>' : ''}${this.edit ? '<span class="del" aria-label="지우기">×</span>' : ''}</span>
         <span class="nm">${esc(x.name)}</span><span class="bd">${this.badge(x)}</span></button>`).join('');
     $$('#shareList .shitem').forEach(b => b.onclick = () => { const i = +b.dataset.i; this.edit ? this.remove(i) : this.show(i); });
   },
