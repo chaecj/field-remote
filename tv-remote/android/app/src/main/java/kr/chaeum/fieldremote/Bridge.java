@@ -37,6 +37,22 @@ public final class Bridge {
     // 볼륨 버튼 클리커 / 화면
     @JavascriptInterface public void setVolumeConfig(String json) { Hub.setVolumeConfig(json); }
     @JavascriptInterface public void keepScreenOn(boolean on) { act.keepScreenOn(on); }
+    // 화면 공유 (TV에 이미지·영상·PDF만 띄우기)
+    @JavascriptInterface public void sharePick() { act.pickShareFiles(); }
+    @JavascriptInterface public void shareShow(String json) { onShare(s -> s.show(json)); }
+    @JavascriptInterface public void shareBlack(boolean on) { onShare(s -> s.setBlack(on)); }
+    @JavascriptInterface public void shareFill(boolean on) { onShare(s -> s.setFill(on)); }
+    @JavascriptInterface public void shareLoop(boolean on) { onShare(s -> s.setLoop(on)); }
+    @JavascriptInterface public void shareMute(boolean on) { onShare(s -> s.setMute(on)); }
+    @JavascriptInterface public void shareVideo(String cmd) { onShare(s -> s.video(cmd)); }
+    @JavascriptInterface public void shareClear() { onShare(ScreenShare::clear); }
+    @JavascriptInterface public void shareForget(String uri) { onShare(s -> s.forget(uri)); }
+    @JavascriptInterface public void shareState() { onShare(ScreenShare::emit); }
+    @JavascriptInterface public boolean openCastSettings() { return act.openCastSettings(); }
+
+    private interface ShareJob { void run(ScreenShare s); }
+    private void onShare(ShareJob j) { Hub.main.post(() -> { if (act.share != null) j.run(act.share); }); }
+
     // 앱 업데이트
     @JavascriptInterface public void checkUpdate() { Updater.check(act); }
     @JavascriptInterface public void installUpdate(String url) { Updater.install(act, url); }

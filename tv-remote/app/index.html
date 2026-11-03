@@ -89,13 +89,7 @@ header.top {
 }
 .banner b { color: var(--warn); }
 .banner.upd { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--bg)); }
-.recbar {
-  display: flex; align-items: center; gap: 10px; border-radius: 12px; padding: 10px 12px;
-  background: color-mix(in srgb, var(--rec) 16%, var(--bg)); border: 1px solid var(--rec); font-size: 13.5px;
-}
-.recbar .r { width: 10px; height: 10px; border-radius: 50%; background: var(--rec); animation: blink 1s steps(2) infinite; }
 @keyframes blink { 50% { opacity: 0.2; } }
-.recbar .grow { flex: 1; }
 
 /* ---------- 버튼 ---------- */
 .key {
@@ -228,19 +222,29 @@ nav.tabs .in { max-width: 480px; margin: 0 auto; display: grid; grid-template-co
 .seg.two { grid-template-columns: repeat(2, 1fr); }
 .hint { margin: 0; color: var(--muted); font-size: 13px; }
 .clk-view { gap: 12px; }
-.pic-view { gap: 12px; }
-.adj { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; height: 150px; }
-.adjbtn { border-radius: 22px; font-size: 14px; gap: 2px; align-content: center; }
-.adjbtn span { font-size: 44px; line-height: 1; font-weight: 400; }
-.adjfoot { display: flex; align-items: center; gap: 8px; }
-.sens.static { position: static; background: var(--panel); border: 1px solid var(--line); }
-.pathrow { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); font-size: 13.5px; }
-.pathrow .grow small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
-.pathrow.todo { border-color: var(--accent); border-style: dashed; }
-.minipad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.minipad .key { min-height: 50px; }
-.minipad .dpok { background: var(--grad); color: var(--accent-ink); }
-.tiplink { border: 0; background: none; color: var(--muted); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; padding: 6px 0; cursor: pointer; justify-self: center; }
+/* 화면 공유 */
+.share-view { gap: 12px; }
+.sharestat .tips { font-size: 13px; }
+.sharestat.off { border-color: var(--accent); border-style: dashed; }
+.sharenow { font-size: 14px; min-height: 22px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; overflow-wrap: anywhere; }
+.muted { color: var(--muted); font-weight: 400; }
+.sharectl { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 8px; }
+.sharectl .key { min-height: 64px; font-size: 15px; }
+.sharectl .key[aria-pressed="true"] { background: var(--key-hi); color: var(--fg); box-shadow: inset 0 0 0 2px var(--accent); }
+.vidctl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.vidctl .key { min-height: 44px; font-size: 13px; }
+.vidctl .key[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent); color: var(--fg); }
+.sharegrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+.shitem { border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 6px; display: grid; gap: 4px; text-align: left; color: var(--fg); cursor: pointer; min-width: 0; font: inherit; }
+.shitem.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.shitem.edit { border-style: dashed; }
+.shitem .th { position: relative; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: #000; display: grid; place-items: center; }
+.shitem .th img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.shitem .ic { color: var(--muted); font-weight: 700; font-size: 15px; }
+.shitem .live { position: absolute; left: 4px; top: 4px; background: var(--rec); color: #fff; font: 700 10px/1 var(--font-mono); padding: 3px 5px; border-radius: 4px; }
+.shitem .del { position: absolute; right: 4px; top: 4px; width: 24px; height: 24px; border-radius: 50%; background: var(--rec); color: #fff; display: grid; place-items: center; font-size: 16px; line-height: 1; }
+.shitem .nm { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shitem .bd { font-size: 11px; color: var(--muted); }
 select.slim { padding: 9px 12px; font-size: 14px; color: var(--muted); }
 .clicker { display: grid; grid-template-columns: 2fr 3fr; gap: 10px; height: calc(100vh - 420px); min-height: 240px; max-height: 520px; }
 .cbig { font-size: 16px; border-radius: 24px; align-content: center; gap: 6px; }
@@ -303,10 +307,9 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
   .clk-view > #clkMode, .clk-view > #clkProg, .clk-view > #clkKeys, .clk-view > #volCard { grid-column: 1; }
   .clk-view > .clicker { grid-row: 1 / span 5; height: calc(100vh - 220px); max-height: none; min-height: 200px; }
 
-  /* 화면 조정: 왼쪽 = 밝기·명암 조절, 오른쪽 = 메뉴 이동 */
-  .pic-view > #picTarget, .pic-view > .adj, .pic-view > .adjfoot, .pic-view > #pathRow { grid-column: 1; }
-  .pic-view > .minipad { grid-row: 1 / span 4; }
-  .pic-view > .tiplink { justify-self: center; }
+  /* 화면 공유: 왼쪽 = 연결·조작, 오른쪽 = 파일 목록 */
+  .share-view > #shareStat, .share-view > .sharenow, .share-view > .sharectl, .share-view > .vidctl, .share-view > .shopts, .share-view > .volrow { grid-column: 1; }
+  .share-view > .shlist { grid-row: 1 / span 7; }
 
   /* TV 설정: 카드 2열 */
   #v-set { grid-template-columns: 1fr; }
@@ -318,7 +321,6 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
 /* 높이가 낮은 가로 화면(휴대폰 가로)에서는 큰 버튼을 조금 줄임 */
 @media (orientation: landscape) and (max-height: 500px) {
   header.top { padding-block: 6px 4px; gap: 6px; }
-  .adj { height: 110px; }
   #v-remote .rocker { height: 170px; }
   #v-remote .dpad { max-width: 210px; }
 }
@@ -337,11 +339,6 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
     <div class="banner upd" id="updBanner" hidden>
       <div id="updText"></div>
       <div class="row"><button class="btn sm" id="updLater">나중에</button><button class="btn sm primary" id="updGo">업데이트</button></div>
-    </div>
-    <div class="recbar" id="recBar" hidden>
-      <span class="r"></span><span class="grow" id="recText">녹화 중</span>
-      <button class="btn sm" id="recCancel">취소</button>
-      <button class="btn sm primary" id="recStop">여기서 저장</button>
     </div>
   </header>
 
@@ -443,41 +440,34 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
     </div>
   </section>
 
-  <!-- 화면 조정: TV 자체의 밝기·명암 -->
-  <section class="view pic-view" id="v-pic" hidden>
-    <div class="seg two" id="picTarget">
-      <button data-pt="bright" aria-pressed="true">밝기</button>
-      <button data-pt="contrast" aria-pressed="false">명암</button>
+  <!-- 화면 공유: 휴대폰의 사진·영상·PDF를 TV에 (TV에는 파일만 나옴) -->
+  <section class="view share-view" id="v-share" hidden>
+    <div class="card sharestat" id="shareStat"></div>
+    <div class="sharenow" id="shareNow"></div>
+    <div class="sharectl">
+      <button class="key" id="shPrev">◀ 이전</button>
+      <button class="key accent" id="shBlack" aria-pressed="true">화면 보이기</button>
+      <button class="key" id="shNext">다음 ▶</button>
     </div>
-
-    <div class="adj">
-      <button class="key adjbtn" id="adjDown" aria-label="낮추기"><span>−</span>낮추기</button>
-      <button class="key adjbtn accent" id="adjUp" aria-label="높이기"><span>+</span>높이기</button>
+    <div class="vidctl" id="vidCtl" hidden>
+      <button class="key" id="shRestart">처음부터</button>
+      <button class="key" id="shPlay">일시정지</button>
+      <button class="key" id="shLoop" aria-pressed="true">반복</button>
+      <button class="key" id="shMute" aria-pressed="false">소리 끄기</button>
     </div>
-    <div class="adjfoot">
-      <span class="hint">한 번에</span>
-      <div class="sens static" id="multBtns" role="group" aria-label="한 번에 움직일 칸 수">
-        <button data-n="1">1칸</button><button data-n="5">5칸</button><button data-n="10">10칸</button>
-      </div>
-      <span class="grow"></span>
-      <button class="btn sm" id="adjClose">메뉴 닫기</button>
+    <div class="shopts grid" style="gap:8px">
+      <span class="label">TV 화면에 맞추기</span>
+      <div class="seg two" id="shFit"><button data-fit="0">맞춤 (여백 생김)</button><button data-fit="1">꽉 채움 (잘릴 수 있음)</button></div>
     </div>
-
-    <div class="pathrow" id="pathRow"></div>
-
-    <div class="minipad">
-      <button class="key" data-act="menu">설정</button>
-      <button class="key" data-act="up" data-repeat aria-label="위">▲</button>
-      <button class="key" data-act="back">뒤로</button>
-      <button class="key" data-act="left" data-repeat aria-label="왼쪽">◀</button>
-      <button class="key dpok" data-act="ok">확인</button>
-      <button class="key" data-act="right" data-repeat aria-label="오른쪽">▶</button>
-      <button class="key" data-act="home">홈</button>
-      <button class="key" data-act="down" data-repeat aria-label="아래">▼</button>
-      <button class="key" data-act="exit">나가기</button>
+    <div class="volrow">
+      <span class="grow">볼륨 버튼으로 넘기기<small>이 탭에서 아래 = 다음 · 위 = 이전</small></span>
+      <button class="toggle" id="shVol" aria-pressed="false">끔</button>
     </div>
-
-    <button class="tiplink" id="tipBtn">카메라 플리커 줄이는 법</button>
+    <div class="shlist grid" style="gap:10px">
+      <div class="row"><button class="btn primary grow" id="shAdd">+ 파일 추가</button><button class="btn" id="shEdit">편집</button></div>
+      <div class="sharegrid" id="shareList"></div>
+      <p class="hint">사진·영상·PDF를 띄울 수 있어요. PPT는 PDF로 저장해서 추가하세요.</p>
+    </div>
   </section>
 
   <!-- TV 설정 -->
@@ -498,7 +488,7 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
     <button role="tab" data-tab="remote" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="7" y="2.5" width="10" height="19" rx="3"/><circle cx="12" cy="8" r="2"/><path d="M10 13h4M10 16h4"/></svg>리모컨</button>
     <button role="tab" data-tab="pad" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="13" rx="2.5"/><path d="M8 20h8M12 17v3"/><path d="M11 9l4 2-2 .7-.8 2.1z" fill="currentColor"/></svg>터치패드</button>
     <button role="tab" data-tab="clk" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8M10 8l3 2-3 2z"/></svg>클리커</button>
-    <button role="tab" data-tab="pic" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>화면 조정</button>
+    <button role="tab" data-tab="share" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6"/><path d="M3 18.5a2.5 2.5 0 0 1 2.5 2.5M3 14.5A6.5 6.5 0 0 1 9.5 21"/><circle cx="3.6" cy="20.4" r=".6" fill="currentColor"/></svg>화면 공유</button>
     <button role="tab" data-tab="set" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>TV 설정</button>
   </div>
 </nav>
@@ -640,7 +630,6 @@ const ACTIONS = {
   play: { label: '재생', hid: cc(0xB0) }, pause: { label: '일시정지', hid: cc(0xB1) }, stop: { label: '정지', hid: cc(0xB7) },
   rew: { label: '되감기', hid: cc(0xB4) }, ff: { label: '빨리감기', hid: cc(0xB3) },
   prev: { label: '이전', hid: cc(0xB6) }, next: { label: '다음', hid: cc(0xB5) },
-  brup: { label: '밝기 +', hid: cc(0x6F) }, brdown: { label: '밝기 −', hid: cc(0x70) },
 };
 for (let i = 0; i < 10; i++) ACTIONS['d' + i] = { label: String(i), hid: kb(i === 0 ? 0x27 : 0x1D + i) };
 // 브랜드 IR이 있으면 IR을 먼저 쓰는 버튼 (USB로는 TV마다 반응이 제각각인 것들)
@@ -875,15 +864,9 @@ function describe(m) {
   return '?';
 }
 
-let recording = null; // { steps, last }
 function runAction(act, opts = {}) {
   const ts = targets();
   if (!ts.length) { ui.toast(dongles.size ? '연결된 TV가 없어요. 위에서 TV를 다시 연결해 주세요.' : '먼저 동글을 추가해 주세요.'); return; }
-  if (recording && !opts.fromMacro) {
-    const now = Date.now();
-    recording.steps.push({ act, wait: recording.steps.length ? clamp(now - recording.last, 200, 4000) : 0 });
-    recording.last = now; ui.renderRec();
-  }
   if (navigator.vibrate) navigator.vibrate(8);
   let missing = 0;
   for (const d of ts) {
@@ -936,7 +919,7 @@ const ui = {
     // 상태
     const on = [...dongles.values()].filter(d => d.state === 'on').length;
     $('#status').textContent = dongles.size ? `${on}/${dongles.size}대 연결` + (groupMode ? ` · ${targets().length}대 동시` : '') : '동글 없음';
-    this.renderSettings(); this.renderMacros(); pushVolumeConfig();
+    this.renderSettings(); pushVolumeConfig();
   },
   log(d, act, m) {
     $('#log').textContent = `${this.name(d)} ← ${ACTIONS[act] ? ACTIONS[act].label : act}  (${describe(m)})`;
@@ -951,31 +934,6 @@ const ui = {
     const chip = $(`.chip[data-id="${CSS.escape(d.id)}"]`);
     if (chip) { chip.classList.add('flash'); chip.scrollIntoView({ inline: 'center', behavior: 'smooth' }); }
     this.toast(`‘${this.name(d)}’ 동글의 버튼이 눌렸어요`);
-  },
-  renderRec() {
-    $('#recBar').hidden = !recording;
-    if (recording) $('#recText').textContent = `녹화 중 · ${recording.steps.length}단계`;
-  },
-  renderMacros() {
-    const box = $('#pathRow'); if (!box) return;
-    const d = dongles.get(current), pt = store.picTarget || 'bright', name = pt === 'bright' ? '밝기' : '명암';
-    if (!d) { box.className = 'pathrow'; box.innerHTML = '<span class="grow">TV를 먼저 선택해 주세요.</span>'; return; }
-    const { path, from } = pathFor(d.id, pt);
-    if (recording && recording.target) {
-      const hint = pathHint(cfgOf(d.id).brand, pt);
-      box.className = 'pathrow todo';
-      box.innerHTML = `<span class="grow">아래 버튼으로 TV의 <b>${name}</b> 조절 칸까지 이동하세요<small>${esc(hint)}</small><small>도착하면 위쪽 ‘여기서 저장’을 누르세요</small></span>`;
-    } else if (path && path.length) {
-      box.className = 'pathrow';
-      box.innerHTML = `<span class="grow">${name} 메뉴 길 · ${esc(from)} · ${path.length}단계<small>+/−를 누르면 자동으로 ${name} 칸을 열어요</small></span><button class="btn sm" id="pathRec">다시 저장</button>`;
-    } else if (pt === 'bright') {
-      box.className = 'pathrow';
-      box.innerHTML = `<span class="grow">밝기 키로 바로 조절해요<small>TV가 반응하지 않으면 밝기 메뉴까지 가는 길을 한 번 저장하세요</small></span><button class="btn sm" id="pathRec">메뉴 길 저장</button>`;
-    } else {
-      box.className = 'pathrow todo';
-      box.innerHTML = `<span class="grow"><b>처음 한 번:</b> 명암 메뉴까지 가는 길 저장<small>명암은 TV 메뉴로만 바꿀 수 있어요. 한 번만 알려 주면 +/−로 조절돼요</small></span><button class="btn sm primary" id="pathRec">저장 시작</button>`;
-    }
-    const b = $('#pathRec'); if (b) b.onclick = () => startPathRec(pt);
   },
   renderPhoneSettings(body, d) {
     let bonded = [];
@@ -1313,6 +1271,8 @@ function pushVolumeConfig() {
   if (!NATIVE) return;
   const st = store.clk || {};
   try {
+    // 화면 공유 탭에서 '볼륨 버튼으로 넘기기'가 켜져 있으면 볼륨 키를 화면 공유가 씀
+    if (shareVolActive()) { Native.setVolumeConfig(JSON.stringify({ next: [], prev: [], swap: false })); return; }
     if (!st.volume) { Native.setVolumeConfig(''); return; }
     const mk = (dir) => targets().map(d => ({ id: d.id, pk: clickerPackets(d, dir).map(p => [b64(p.b), p.r]) }));
     Native.setVolumeConfig(JSON.stringify({ next: mk(1), prev: mk(-1), swap: !!st.swap }));
@@ -1341,7 +1301,9 @@ window.__native = {
     d.logs = (d.logs || []).concat(t + '  ' + msg).slice(-12);
     if (current === d.id) ui.renderSettings();
   },
-  onVolumeKey(dir) { if (window.__clk) window.__clk.count(dir); },
+  onVolumeKey(dir) { if (shareVolActive()) share.step(dir); else if (window.__clk) window.__clk.count(dir); },
+  onShare(j) { share.onState(j); },
+  onShareItems(j) { try { share.add(JSON.parse(j)); } catch (e) {} },
   onUpdate(state, latest, cur, name, url) { upd.onResult(state, latest, cur, name, url); },
   onUpdateProgress(pct) { upd.onProgress(pct); },
   onPerm(ok) { if (!ok) ui.toast('블루투스 권한을 허용해야 동글을 찾고 연결할 수 있어요.'); },
@@ -1677,133 +1639,154 @@ function bindTouchpad() {
   syncLive();
 }
 
-let picOpenAt = 0;   // 마지막으로 밝기 칸을 조작한 시각 (최근이면 메뉴가 열려 있다고 봄)
-// 메뉴 길은 브랜드별로 같이 씀 (브랜드를 안 고른 TV끼리도 하나로 묶음). 이 TV만 따로 저장한 길이 있으면 그걸 먼저 씀
-const brandKey = (id) => cfgOf(id).brand || '_none';
-const brandName = (id) => { const b = cfgOf(id).brand; return b ? `${BRANDS[b].label} TV` : '브랜드 미선택 TV'; };
-function pathFor(id, pt) {
-  const own = (cfgOf(id).paths || {})[pt];
-  if (own && own.length) return { path: own, from: '이 TV 전용' };
-  const shared = ((store.brandPaths || {})[brandKey(id)] || {})[pt];
-  if (shared && shared.length) return { path: shared, from: `${brandName(id)} 공용` };
-  return { path: null, from: '' };
-}
-// 브랜드별 메뉴 위치 안내 (연식마다 조금 다를 수 있음)
-const PATH_HINTS = {
-  samsung: { bright: '설정(톱니) → 모든 설정 → 화면 → 전문가 설정 → 밝기', contrast: '설정(톱니) → 모든 설정 → 화면 → 전문가 설정 → 명암' },
-  lg: { bright: '설정 → 모든 설정 → 화면 → 화면 모드 설정 → 밝기(백라이트)', contrast: '설정 → 모든 설정 → 화면 → 화면 모드 설정 → 명암' },
-  sony: { bright: '설정 → 디스플레이 및 음향 → 화면 → 밝기', contrast: '설정 → 디스플레이 및 음향 → 화면 → 명암' },
+/* ---------------- 화면 공유 ---------------- */
+// 휴대폰이 TV에 화면 미러링(스마트 뷰)이나 HDMI 케이블로 연결되면, TV에는 고른 파일만 TV 해상도에 맞춰 나옴 (안드로이드 앱)
+var share = {
+  st: { disp: null, black: true, fill: false, loop: true, mute: false, video: false, playing: false, err: '' },
+  edit: false,
+  get s() {
+    // 같은 객체를 계속 씀 (빠진 값만 채움)
+    const d = { items: [], cur: -1, page: 0, fill: false, loop: true, mute: false, vol: false };
+    const o = store.share || (store.share = {});
+    for (const k in d) if (!(k in o)) o[k] = d[k];
+    return o;
+  },
+  item() { const s = this.s; return s.items[s.cur] || null; },
+  show(i, page = 0) {
+    const s = this.s, it = s.items[i]; if (!it) return;
+    if (!this.st.disp) { ui.toast('먼저 TV 화면을 연결해 주세요.'); return; }
+    s.cur = i; s.page = clamp(page, 0, Math.max(0, (it.pages || 1) - 1)); save();
+    try { Native.shareShow(JSON.stringify({ uri: it.uri, type: it.type, page: s.page })); } catch (e) {}
+    this.render();
+  },
+  // 다음/이전: PDF는 한 장씩, 끝나면 다음 파일
+  step(dir) {
+    const s = this.s, it = this.item();
+    if (!s.items.length) return;
+    if (!it || this.st.black && s.cur < 0) { this.show(0); return; }
+    if (it.type === 'pdf' && s.page + dir >= 0 && s.page + dir < (it.pages || 1)) { this.show(s.cur, s.page + dir); return; }
+    const n = s.cur + dir;
+    if (n < 0 || n >= s.items.length) { ui.toast(dir > 0 ? '마지막이에요' : '처음이에요'); return; }
+    const nx = s.items[n];
+    this.show(n, dir < 0 && nx.type === 'pdf' ? (nx.pages || 1) - 1 : 0);
+  },
+  add(list) {
+    const s = this.s; let added = 0, ppt = 0, other = 0;
+    for (const it of list) {
+      if (it.type === 'ppt') { ppt++; try { Native.shareForget(it.uri); } catch (e) {} continue; }
+      if (!['image', 'video', 'pdf'].includes(it.type)) { other++; try { Native.shareForget(it.uri); } catch (e) {} continue; }
+      if (s.items.some(x => x.uri === it.uri)) continue;
+      s.items.push({ uri: it.uri, name: it.name || '파일', type: it.type, pages: it.pages || 0, dur: it.dur || 0, thumb: it.thumb || '' });
+      added++;
+    }
+    save(); this.render();
+    if (ppt) this.pptHelp();
+    else if (other) ui.toast('이미지·영상·PDF만 띄울 수 있어요.');
+    else if (added) ui.toast(`${added}개를 추가했어요`);
+  },
+  remove(i) {
+    const s = this.s, it = s.items[i]; if (!it) return;
+    try { Native.shareForget(it.uri); } catch (e) {}
+    s.items.splice(i, 1);
+    if (s.cur === i) { s.cur = -1; try { Native.shareClear(); } catch (e) {} }
+    else if (s.cur > i) s.cur--;
+    save(); this.render();
+  },
+  pptHelp() {
+    openSheet(`<h3>PPT는 PDF로 저장해서 올려 주세요</h3>
+      <p style="margin:0;color:var(--muted)">휴대폰에서는 PPT를 그대로 그릴 수 없어요. PDF로 바꾸면 슬라이드 한 장씩 TV 해상도에 맞춰 띄울 수 있어요.</p>
+      <ul class="tips">
+        <li><b>파워포인트 앱:</b> 파일 → 내보내기(또는 다른 이름으로 저장) → PDF</li>
+        <li><b>PC 파워포인트:</b> 파일 → 내보내기 → PDF 만들기</li>
+        <li><b>구글 슬라이드:</b> 더보기 → 공유 및 내보내기 → 다른 이름으로 저장 → PDF</li>
+      </ul>
+      <button class="btn" data-x>닫기</button>`, (s, close) => { $('[data-x]', s).onclick = close; });
+  },
+  fmt(ms) { const t = Math.round(ms / 1000); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; },
+  badge(it) {
+    if (it.type === 'video') return '영상' + (it.dur ? ' ' + this.fmt(it.dur) : '');
+    if (it.type === 'pdf') return `PDF ${it.pages || '?'}장`;
+    return '사진';
+  },
+  onState(j) {
+    let st; try { st = JSON.parse(j); } catch (e) { return; }
+    const was = !!this.st.disp;
+    this.st = st;
+    if (st.err) ui.toast(st.err);
+    if (!was && st.disp) ui.toast('TV 화면이 연결됐어요. TV에는 고른 파일만 나와요.');
+    if (was && !st.disp) ui.toast('TV 화면 연결이 끊겼어요.');
+    this.render();
+  },
+  render() {
+    const box = $('#shareStat'); if (!box) return;
+    const s = this.s, st = this.st, it = this.item();
+    if (!NATIVE) {
+      box.innerHTML = '<h2>화면 공유</h2><p>안드로이드 앱(HW 리모컨)에서만 쓸 수 있어요.</p>';
+    } else if (!st.disp) {
+      box.className = 'card sharestat off';
+      box.innerHTML = `<div class="row"><span class="dot offline"></span><h2 class="grow">TV 화면 연결 안 됨</h2></div>
+        <ol class="tips">
+          <li>휴대폰 화면 위에서 아래로 내려 <b>스마트 뷰</b>(삼성) 또는 <b>화면 전송·미러링</b>을 누르고 TV를 고르세요.</li>
+          <li>또는 <b>USB-C → HDMI 케이블</b>로 TV에 꽂으세요. (케이블 화면 출력을 지원하는 휴대폰만)</li>
+          <li>연결되면 TV는 검은 화면이 되고, 휴대폰 화면은 TV에 나오지 않아요.</li>
+        </ol>
+        <button class="btn" id="castBtn">화면 전송 설정 열기</button>`;
+      $('#castBtn').onclick = () => { let ok = false; try { ok = Native.openCastSettings(); } catch (e) {} if (!ok) ui.toast('휴대폰 빠른 설정에서 스마트 뷰(화면 전송)를 눌러 주세요.'); };
+    } else {
+      box.className = 'card sharestat';
+      box.innerHTML = `<div class="row"><span class="dot on"></span><h2 class="grow">TV 화면 연결됨</h2><span class="pill ok">${st.disp.w}×${st.disp.h}</span></div>
+        <p>${esc(st.disp.name || 'TV')} · TV 해상도(${st.disp.w}×${st.disp.h})에 맞춰 파일만 보여 줘요.</p>`;
+    }
+    // 지금 TV에 나오는 것
+    const now = $('#shareNow');
+    if (!st.disp) now.innerHTML = '<span class="muted">TV 연결을 기다리는 중</span>';
+    else if (st.black || !it) now.innerHTML = `<b>TV: 검은 화면</b>${it ? `<span class="muted"> · 다음: ${esc(it.name)}</span>` : ''}`;
+    else now.innerHTML = `<b>TV: ${esc(it.name)}</b>${it.type === 'pdf' ? ` <span class="pill">${s.page + 1} / ${it.pages}</span>` : ''}${it.type === 'video' ? ` <span class="pill">${st.playing ? '재생 중' : '멈춤'}</span>` : ''}`;
+    $('#shBlack').setAttribute('aria-pressed', !!st.black);
+    $('#shBlack').textContent = st.black ? '화면 보이기' : '검은 화면';
+    $('#vidCtl').hidden = !(st.disp && it && it.type === 'video');
+    $('#shPlay').textContent = st.playing ? '일시정지' : '재생';
+    $('#shLoop').setAttribute('aria-pressed', !!s.loop);
+    $('#shMute').setAttribute('aria-pressed', !!s.mute);
+    $('#shMute').textContent = s.mute ? '소리 켜기' : '소리 끄기';
+    $$('#shFit button').forEach(b => b.setAttribute('aria-pressed', (b.dataset.fit === '1') === !!s.fill));
+    $('#shVol').setAttribute('aria-pressed', !!s.vol); $('#shVol').textContent = s.vol ? '켬' : '끔';
+    $('#shEdit').textContent = this.edit ? '완료' : '편집';
+    $('#shEdit').hidden = !s.items.length;
+    // 파일 목록
+    const list = $('#shareList');
+    if (!s.items.length) { list.innerHTML = '<div class="empty">아직 파일이 없어요. ‘파일 추가’로 사진·영상·PDF를 고르세요.</div>'; return; }
+    list.innerHTML = s.items.map((x, i) => `<button class="shitem${i === s.cur && !st.black ? ' on' : ''}${this.edit ? ' edit' : ''}" data-i="${i}">
+        <span class="th">${x.thumb ? `<img src="${x.thumb}" alt="">` : `<span class="ic">${x.type === 'video' ? '▶' : x.type === 'pdf' ? 'PDF' : '🖼'}</span>`}${i === s.cur && !st.black ? '<span class="live">TV</span>' : ''}${this.edit ? '<span class="del" aria-label="지우기">×</span>' : ''}</span>
+        <span class="nm">${esc(x.name)}</span><span class="bd">${this.badge(x)}</span></button>`).join('');
+    $$('#shareList .shitem').forEach(b => b.onclick = () => { const i = +b.dataset.i; this.edit ? this.remove(i) : this.show(i); });
+  },
 };
-function pathHint(brand, pt) {
-  const h = PATH_HINTS[brand];
-  if (h) return '보통 ' + h[pt];
-  return `보통 설정 → 화면(영상) → ${pt === 'bright' ? '밝기(백라이트)' : '명암'}`;
-}
-function startPathRec(target) {
-  if (!dongles.get(current)) { ui.toast('TV를 먼저 선택해 주세요.'); return; }
-  const name = target === 'bright' ? '밝기' : '명암', brand = cfgOf(current).brand;
-  openSheet(`<h3>${name} 메뉴 길 찾기</h3>
-    <ol class="tips">
-      <li>TV에 <b>메뉴가 하나도 안 열린 상태</b>에서 시작하세요.</li>
-      <li>‘시작’을 누르고 이 화면 아래 버튼(<b>설정 · ▲▼◀▶ · 확인</b>)만으로 이동하세요. TV 리모컨으로 누른 건 기록되지 않아요.</li>
-      <li>${esc(pathHint(brand, target))}</li>
-      <li>TV가 마지막 위치를 기억하기도 해요. 메뉴마다 <b>▲를 넉넉히 눌러 맨 위로 간 뒤</b> 내려가면 다음에도 정확해요.</li>
-      <li>숫자 막대(${name} 조절 칸)가 보이면 위쪽 <b>‘여기서 저장’</b>.</li>
-    </ol>
-    <div class="row"><button class="btn grow" data-x>닫기</button><button class="btn primary grow" data-go>시작</button></div>`,
-    (s, close) => {
-      $('[data-x]', s).onclick = close;
-      $('[data-go]', s).onclick = () => {
-        close();
-        recording = { steps: [], last: Date.now(), target, dev: current }; ui.renderRec(); ui.renderMacros();
-        ui.toast('설정 버튼부터 눌러 이동하세요.');
-      };
-    });
-}
-// 저장한 메뉴 길 다시 실행: 녹화 때 간격을 그대로 지키고 (예전엔 1.2초로 잘라서 TV가 따라오지 못했음)
-// 메뉴가 열리거나 한 단계 들어갈 때는 TV 화면이 바뀔 시간을 더 줌. 버튼이 빠지지 않게 확인 받으며 보냄
-const OPENERS = new Set(['menu', 'home', 'qmenu', 'tools']);
-async function runPath(steps) {
-  let prev = null;
-  for (const s of steps) {
-    let w = clamp(s.wait || 0, 350, 4000);
-    if (OPENERS.has(prev)) w = Math.max(w, 1800);
-    else if (prev === 'ok') w = Math.max(w, 800);
-    if (prev) await sleep(w);
-    runAction(s.act, { fromMacro: true, reliable: true });
-    prev = s.act;
+function bindShare() {
+  const s = share.s;
+  $('#shAdd').onclick = () => { if (!NATIVE) { ui.toast('안드로이드 앱에서만 쓸 수 있어요.'); return; } Native.sharePick(); };
+  $('#shEdit').onclick = () => { share.edit = !share.edit; share.render(); };
+  $('#shPrev').onclick = () => share.step(-1);
+  $('#shNext').onclick = () => share.step(1);
+  $('#shBlack').onclick = () => {
+    if (!share.st.disp) { ui.toast('먼저 TV 화면을 연결해 주세요.'); return; }
+    if (share.st.black && !share.item()) { if (share.s.items.length) share.show(0); return; }
+    try { Native.shareBlack(!share.st.black); } catch (e) {}
+  };
+  $('#shPlay').onclick = () => { try { Native.shareVideo('toggle'); } catch (e) {} };
+  $('#shRestart').onclick = () => { try { Native.shareVideo('restart'); } catch (e) {} };
+  $('#shLoop').onclick = () => { s.loop = !s.loop; save(); try { Native.shareLoop(s.loop); } catch (e) {} share.render(); };
+  $('#shMute').onclick = () => { s.mute = !s.mute; save(); try { Native.shareMute(s.mute); } catch (e) {} share.render(); };
+  $$('#shFit button').forEach(b => b.onclick = () => { s.fill = b.dataset.fit === '1'; save(); try { Native.shareFill(s.fill); } catch (e) {} share.render(); });
+  $('#shVol').onclick = () => { s.vol = !s.vol; save(); pushVolumeConfig(); share.render(); if (s.vol) ui.toast('화면 공유 탭에서 볼륨 아래 = 다음, 위 = 이전'); };
+  if (NATIVE) {
+    // 앱을 켤 때 TV는 검은 화면에서 시작 (지난번 파일을 저절로 띄우지 않음)
+    s.cur = -1;
+    try { Native.shareFill(!!s.fill); Native.shareLoop(!!s.loop); Native.shareMute(!!s.mute); Native.shareState(); } catch (e) {}
   }
-  await sleep(OPENERS.has(prev) ? 1800 : 800);
+  share.render();
 }
-function bindPicture() {
-  store.picTarget = store.picTarget || 'bright';
-  const syncTarget = () => { $$('#picTarget button').forEach(b => b.setAttribute('aria-pressed', b.dataset.pt === store.picTarget)); ui.renderMacros(); };
-  $$('#picTarget button').forEach(b => b.onclick = () => { store.picTarget = b.dataset.pt; save(); picOpenAt = 0; syncTarget(); });
-  const setMult = (n) => { store.mult = n; save(); $$('#multBtns button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.n === n)); };
-  setMult([1, 5, 10].includes(store.mult) ? store.mult : 5);
-  $$('#multBtns button').forEach(b => b.onclick = () => setMult(+b.dataset.n));
-  let busy = false;
-  const adjust = async (act) => {
-    if (busy) return;
-    const d = dongles.get(current); if (!d) { ui.toast('TV를 먼저 선택해 주세요.'); return; }
-    busy = true;
-    try {
-      const pt = store.picTarget, { path } = pathFor(d.id, pt);
-      const up = act === 'right';
-      if (path && path.length) {
-        // 저장한 메뉴 길로 조절 칸을 연 뒤 ◀/▶
-        if (Date.now() - picOpenAt > 20000) { ui.toast('조절 칸을 여는 중…'); await runPath(path); }
-        for (let i = 0; i < store.mult; i++) { runAction(act, { fromMacro: true, reliable: true }); await sleep(120); }
-        picOpenAt = Date.now();
-      } else if (pt === 'bright') {
-        // 메뉴 길이 없으면 밝기 키(USB·블루투스 표준 키)를 바로 보냄. 방향키는 보내지 않음
-        for (let i = 0; i < store.mult; i++) { runAction(up ? 'brup' : 'brdown', { fromMacro: true }); await sleep(120); }
-        if (!store.brHint) { store.brHint = 1; save(); ui.toast('밝기 키를 보냈어요. TV가 그대로면 아래 ‘메뉴 길 저장’을 해 주세요.'); }
-      } else {
-        // 명암은 표준 키가 없어 메뉴 길이 꼭 필요함
-        ui.toast('명암은 TV 메뉴로만 바꿀 수 있어요. 메뉴 길을 한 번 저장해 주세요.');
-        startPathRec('contrast');
-      }
-    } finally { busy = false; }
-  };
-  $('#adjDown').onclick = () => adjust('left');
-  $('#adjUp').onclick = () => adjust('right');
-  $('#adjClose').onclick = async () => { picOpenAt = 0; runAction('exit', { fromMacro: true }); };
-  $('#recCancel').onclick = () => { recording = null; ui.renderRec(); ui.renderMacros(); };
-  $('#recStop').onclick = () => {
-    const rec = recording; recording = null; ui.renderRec();
-    if (!rec || !rec.steps.length) { ui.toast('누른 버튼이 없어요.'); ui.renderMacros(); return; }
-    const id = rec.dev || current, c = cfgOf(id), name = rec.target === 'bright' ? '밝기' : '명암', group = brandName(id);
-    picOpenAt = Date.now();   // 지금 그 칸에 있음
-    const done = (shared) => {
-      c.paths = c.paths || {};
-      if (shared) {
-        store.brandPaths = store.brandPaths || {};
-        const bp = store.brandPaths[brandKey(id)] = store.brandPaths[brandKey(id)] || {};
-        bp[rec.target] = rec.steps; delete c.paths[rec.target];
-      } else c.paths[rec.target] = rec.steps;
-      save(); ui.renderMacros();
-      ui.toast(`${name} 메뉴 길을 ${shared ? group + ' 모두에' : '이 TV에만'} 저장했어요. 이제 +/−만 누르면 돼요.`);
-    };
-    openSheet(`<h3>${name} 메뉴 길 저장</h3>
-      <p>같은 브랜드 TV는 메뉴가 거의 같아요. 기종이 다른 TV만 그 TV에서 ‘이 TV만’으로 다시 저장하면 돼요.</p>
-      <div class="row"><button class="btn grow" data-one>이 TV만</button><button class="btn primary grow" data-all>${esc(group)} 모두</button></div>`,
-      (s, close) => {
-        $('[data-one]', s).onclick = () => { close(); done(false); };
-        $('[data-all]', s).onclick = () => { close(); done(true); };
-        $('.scrim').onclick = () => { close(); done(true); };   // 바깥을 눌러도 공용으로 저장
-      });
-  };
-  $('#tipBtn').onclick = () => openSheet(`<h3>카메라 플리커 줄이는 법</h3>
-    <ul class="tips">
-      <li><b>밝기(백라이트)는 높게</b> 두고, 너무 밝으면 <b>명암</b>으로 낮추세요. 백라이트를 낮추면 깜빡임(PWM)이 생기는 TV가 많아요.</li>
-      <li>그래도 밝으면 화면에 <b>ND 필름</b>을 붙이거나 소품 이미지를 어둡게 만드세요.</li>
-      <li><b>절전·에코 모드, 자동 밝기, 동작 보정</b>은 끄세요.</li>
-      <li>화면 모드는 <b>영화·필름메이커 모드</b>가 가장 안정적이에요.</li>
-      <li>24fps에서 줄이 보이면 셔터를 <b>1/60(144°)</b> 쪽으로 맞춰 보세요.</li>
-    </ul><button class="btn" data-x>닫기</button>`, (s, close) => { $('[data-x]', s).onclick = close; });
-  syncTarget();
-}
+function shareVolActive() { return NATIVE && !!share && !!share.s.vol && !$("#v-share").hidden; }
 
 /* ---------------- 클리커 ---------------- */
 // 키: [HID 키코드, 수식키]  수식키 비트: 1=Ctrl 2=Shift 4=Alt 8=Cmd/Win
@@ -1888,8 +1871,10 @@ function bindClicker() {
 
 function switchTab(name) {
   $$('nav.tabs [data-tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name));
-  ['remote', 'pad', 'clk', 'pic', 'set'].forEach(t => { $('#v-' + t).hidden = t !== name; });
+  ['remote', 'pad', 'clk', 'share', 'set'].forEach(t => { $('#v-' + t).hidden = t !== name; });
   try { sessionStorage.setItem('fr.tab', name); } catch (e) {}
+  pushVolumeConfig();
+  if (name === 'share') share.render();
 }
 
 let wakeLock = null;
@@ -1908,6 +1893,7 @@ function syncWake(btn) { btn.setAttribute('aria-pressed', !!wakeLock); btn.textC
 function init() {
   $$('nav.tabs [data-tab]').forEach(b => b.onclick = () => switchTab(b.dataset.tab));
   let tab = 'remote'; try { tab = sessionStorage.getItem('fr.tab') || 'remote'; } catch (e) {}
+  if (!$('#v-' + tab)) tab = 'remote';   // 없어진 탭(예전 화면 조정)이면 리모컨으로
   switchTab(tab);
   $('#groupBtn').onclick = (e) => {
     groupMode = !groupMode; e.currentTarget.setAttribute('aria-pressed', groupMode);
@@ -1926,7 +1912,7 @@ function init() {
     setTimeout(() => upd.check(false), 1500);   // 켤 때마다 조용히 확인
   }
   $('#wakeBtn').onclick = (e) => toggleWake(e.currentTarget);
-  bindKeys(); bindTouchpad(); bindPicture(); bindClicker();
+  bindKeys(); bindTouchpad(); bindShare(); bindClicker();
   document.addEventListener('visibilitychange', () => {
     if (!NATIVE && document.visibilityState === 'visible' && $('#wakeBtn').getAttribute('aria-pressed') === 'true' && !wakeLock) toggleWake($('#wakeBtn'));
   });

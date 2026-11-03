@@ -23,11 +23,13 @@ import java.util.List;
 
 /** 화면: 리모컨 HTML을 띄우고, 블루투스 권한과 볼륨 버튼을 처리 */
 public class MainActivity extends Activity {
-    private static final int REQ_PERMS = 10, REQ_ENABLE_BT = 11, REQ_DISCOVERABLE = 12;
+    private static final int REQ_PERMS = 10, REQ_ENABLE_BT = 11, REQ_DISCOVERABLE = 12, REQ_SHARE_PICK = 13;
 
     private WebView web;
     private final List<Runnable> afterBluetooth = new ArrayList<>();
     private boolean asking = false;
+    ScreenShare share;
+    private boolean userKeepOn = false, shareKeepOn = false;
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override protected void onCreate(Bundle state) {
@@ -55,12 +57,17 @@ public class MainActivity extends Activity {
         Hub.setSink(js -> { if (web != null) web.evaluateJavascript(js, null); });
         web.loadUrl("file:///android_asset/index.html");
 
+        // 화면 공유: TV가 미러링·케이블로 연결되면 TV에는 고른 파일만 보여 줌
+        share = new ScreenShare(this);
+        share.start();
+
         // 처음 실행: 권한 받고 연결 유지 서비스 시작
         withBluetooth(() -> RemoteService.start(this));
     }
 
     @Override protected void onDestroy() {
         Hub.setSink(null);
+        if (share != null) { share.stop(); share = null; }
         if (web != null) { web.destroy(); web = null; }
         super.onDestroy();
     }
@@ -130,6 +137,10 @@ public class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int code, int result, Intent data) {
         super.onActivityResult(code, result, data);
+        if (code == REQ_SHARE_PICK) {
+            if (result == RESULT_OK && data != null && share != null) share.onPicked(data);
+            return;
+        }
         if (code == REQ_ENABLE_BT) {
             if (btOn()) flush();
             else { asking = false; afterBluetooth.clear(); Hub.emit("onPerm", false); }
@@ -145,11 +156,31 @@ public class MainActivity extends Activity {
         });
     }
 
-    void keepScreenOn(boolean on) {
+    void keepScreenOn(boolean on) { userKeepOn = on; applyKeepOn(); }
+
+    /** TV에 화면 공유 중에는 휴대폰 화면이 꺼지지 않게 (꺼지면 TV 쪽도 끊김) */
+    void setShareKeepOn(boolean on) { shareKeepOn = on; applyKeepOn(); }
+
+    private void applyKeepOn() {
         runOnUiThread(() -> {
-            if (on) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            if (userKeepOn || shareKeepOn) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         });
+    }
+
+    void pickShareFiles() {
+        runOnUiThread(() -> {
+            try { startActivityForResult(ScreenShare.pickIntent(), REQ_SHARE_PICK); } catch (Exception ignored) {}
+        });
+    }
+
+    /** 휴대폰의 화면 전송(스마트 뷰·미러링) 설정 열기. 없으면 false */
+    boolean openCastSettings() {
+        String[] actions = {"android.settings.CAST_SETTINGS", "android.settings.WIFI_DISPLAY_SETTINGS"};
+        for (String a : actions) {
+            try { startActivity(new Intent(a)); return true; } catch (Exception ignored) {}
+        }
+        return false;
     }
 
     // ---------- 볼륨 버튼 / 뒤로 ----------
