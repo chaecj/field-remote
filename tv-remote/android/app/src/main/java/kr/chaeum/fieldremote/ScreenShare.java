@@ -127,12 +127,13 @@ final class ScreenShare implements DisplayManager.DisplayListener {
         return ds.length > 0 ? ds[0] : null;
     }
 
-    private void refresh() {
+    void refresh() {
         Display d = findDisplay();
         if (d == null) { releaseVideo(); dismiss(); emit(); return; }
         Display.Mode m = d.getMode();
         int w = m.getPhysicalWidth(), h = m.getPhysicalHeight();
-        if (screen != null && d.getDisplayId() == dispId) {
+        // TV 화면이 아직 떠 있을 때만 그대로 씀 (안드로이드가 스스로 닫았으면 새로 만듦)
+        if (screen != null && d.getDisplayId() == dispId && screen.isShowing()) {
             if (w != dispW || h != dispH) { dispW = w; dispH = h; render(); }
             emit();
             return;
@@ -142,7 +143,14 @@ final class ScreenShare implements DisplayManager.DisplayListener {
         dispId = d.getDisplayId(); dispW = w; dispH = h;
         webPpt = null;
         TvScreen s = new TvScreen(act, d);
-        try { s.show(); } catch (WindowManager.InvalidDisplayException | IllegalStateException e) { dispId = -1; emit(); return; }
+        // 화면 비율·밀도가 바뀌거나 앱을 잠깐 나갔다 오면 안드로이드가 TV 화면을 스스로 닫음 → 알아채고 다시 만듦
+        s.setOnDismissListener(x -> {
+            if (screen != x) return;   // 우리가 닫은 것
+            screen = null; dispId = -1; webPpt = null;
+            releaseVideo();
+            Hub.main.postDelayed(this::refresh, 300);
+        });
+        try { s.show(); } catch (RuntimeException e) { dispId = -1; emit(); Hub.main.postDelayed(this::refresh, 1500); return; }
         screen = s;
         act.setShareKeepOn(true);
         render();
@@ -150,8 +158,9 @@ final class ScreenShare implements DisplayManager.DisplayListener {
     }
 
     private void dismiss() {
-        if (screen != null) { try { screen.dismiss(); } catch (Exception ignored) {} }
-        screen = null; dispId = -1; webPpt = null;
+        TvScreen old = screen;
+        screen = null; dispId = -1; webPpt = null;   // 먼저 비워서 닫힘 알림이 '스스로 닫힘'으로 오해되지 않게
+        if (old != null) { try { old.dismiss(); } catch (Exception ignored) {} }
         act.setShareKeepOn(false);
     }
 
