@@ -112,9 +112,16 @@ header.top {
 .g3 { grid-template-columns: repeat(3, 1fr); }
 .g7 { grid-template-columns: repeat(7, 1fr); gap: 6px; }
 .g7 .key { min-height: 46px; border-radius: 11px; }
+.g5 { grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.g5 .key { min-height: 46px; border-radius: 11px; font-size: 17px; font-weight: 600; }
 
 section.view { display: grid; gap: 16px; padding-top: 8px; }
 .label { font-size: 11.5px; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+
+/* 리모컨 탭: 한 화면에 다 들어가게. 방향키 크기(--dp)를 화면 높이에 맞춤 */
+#v-remote { gap: 12px; --dp: clamp(150px, calc(100dvh - 590px), 236px); }
+#v-remote .dpad { width: var(--dp); max-width: 100%; }
+#v-remote .rocker { height: calc(var(--dp) * 0.82); }
 
 /* D-pad */
 .pad-wrap { display: grid; grid-template-columns: 64px 1fr 64px; gap: 12px; align-items: center; }
@@ -300,8 +307,7 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
   /* 리모컨: 왼쪽 = 전원줄 + 방향키, 오른쪽 = 나머지 */
   #v-remote > .g4:first-child, #v-remote > .pad-wrap { grid-column: 1; }
   #v-remote > .pad-wrap { grid-row: 2 / span 2; }
-  #v-remote .dpad { max-width: 300px; }
-  #v-remote .rocker { height: 220px; }
+  #v-remote { --dp: clamp(180px, calc(100dvh - 300px), 300px); }
   #v-remote .log { grid-column: 1 / -1; }
 
   /* 터치패드: 왼쪽 = 글자 입력, 오른쪽 = 패드 */
@@ -327,8 +333,8 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
 /* 높이가 낮은 가로 화면(휴대폰 가로)에서는 큰 버튼을 조금 줄임 */
 @media (orientation: landscape) and (max-height: 500px) {
   header.top { padding-block: 6px 4px; gap: 6px; }
-  #v-remote .rocker { height: 170px; }
-  #v-remote .dpad { max-width: 210px; }
+  #v-remote { --dp: clamp(120px, calc(100dvh - 255px), 210px); gap: 8px; }
+  #v-remote .key { min-height: 42px; }
 }
 </style>
 </head>
@@ -377,10 +383,9 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
       </div>
     </div>
 
-    <div class="grid g4">
-      <button class="key" data-act="back">뒤로</button>
-      <button class="key" data-act="exit">나가기</button>
-      <button class="key" data-act="info">정보</button>
+    <div class="grid g3 rowb">
+      <button class="key" data-act="back" title="메뉴에서 한 단계 뒤로">뒤로</button>
+      <button class="key" data-act="exit" title="열린 메뉴·앱을 한 번에 닫고 TV 화면으로">나가기</button>
       <button class="key" data-act="mute">음소거</button>
     </div>
 
@@ -394,11 +399,10 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
       <button class="key" data-act="next" aria-label="다음"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 6v12l10-6z"/><rect x="17" y="6" width="2" height="12"/></svg></button>
     </div>
 
-    <div class="grid g3" id="numpad">
-        <button class="key" data-act="d1">1</button><button class="key" data-act="d2">2</button><button class="key" data-act="d3">3</button>
-        <button class="key" data-act="d4">4</button><button class="key" data-act="d5">5</button><button class="key" data-act="d6">6</button>
-        <button class="key" data-act="d7">7</button><button class="key" data-act="d8">8</button><button class="key" data-act="d9">9</button>
-        <span></span><button class="key" data-act="d0">0</button><span></span>
+    <!-- 숫자: 1~5 / 6~0 두 줄 (세로 스크롤이 생기지 않게) -->
+    <div class="grid g5" id="numpad">
+        <button class="key" data-act="d1">1</button><button class="key" data-act="d2">2</button><button class="key" data-act="d3">3</button><button class="key" data-act="d4">4</button><button class="key" data-act="d5">5</button>
+        <button class="key" data-act="d6">6</button><button class="key" data-act="d7">7</button><button class="key" data-act="d8">8</button><button class="key" data-act="d9">9</button><button class="key" data-act="d0">0</button>
     </div>
     <div class="log" id="log"></div>
   </section>
