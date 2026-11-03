@@ -857,11 +857,11 @@ function packetsFor(d, m, peek) {
   if (m.type === 'ir' || m.type === 'pronto') return irPackets(d, irFrame(d, m, peek));
   return [];
 }
-function exec(d, m) {
+function exec(d, m, reliable) {
   const pk = packetsFor(d, m);
   if (!pk.length) return Promise.reject(new Error('none'));
   let last;
-  for (const p of pk) last = d.write(p.b, p.r);
+  for (const p of pk) last = d.write(p.b, p.r || !!reliable);
   return last;
 }
 function describe(m) {
@@ -889,7 +889,7 @@ function runAction(act, opts = {}) {
   for (const d of ts) {
     const m = resolve(d, act);
     if (!m) { missing++; continue; }
-    exec(d, m).catch(() => {});
+    exec(d, m, opts.reliable).catch(() => {});
     ui.log(d, act, m);
   }
   if (missing && missing === ts.length) {
@@ -1720,9 +1720,20 @@ function startPathRec(target) {
       };
     });
 }
+// 저장한 메뉴 길 다시 실행: 녹화 때 간격을 그대로 지키고 (예전엔 1.2초로 잘라서 TV가 따라오지 못했음)
+// 메뉴가 열리거나 한 단계 들어갈 때는 TV 화면이 바뀔 시간을 더 줌. 버튼이 빠지지 않게 확인 받으며 보냄
+const OPENERS = new Set(['menu', 'home', 'qmenu', 'tools']);
 async function runPath(steps) {
-  for (const s of steps) { await sleep(Math.max(250, Math.min(s.wait || 0, 1200))); runAction(s.act, { fromMacro: true }); }
-  await sleep(400);
+  let prev = null;
+  for (const s of steps) {
+    let w = clamp(s.wait || 0, 350, 4000);
+    if (OPENERS.has(prev)) w = Math.max(w, 1800);
+    else if (prev === 'ok') w = Math.max(w, 800);
+    if (prev) await sleep(w);
+    runAction(s.act, { fromMacro: true, reliable: true });
+    prev = s.act;
+  }
+  await sleep(OPENERS.has(prev) ? 1800 : 800);
 }
 function bindPicture() {
   store.picTarget = store.picTarget || 'bright';
@@ -1742,7 +1753,7 @@ function bindPicture() {
       if (path && path.length) {
         // 저장한 메뉴 길로 조절 칸을 연 뒤 ◀/▶
         if (Date.now() - picOpenAt > 20000) { ui.toast('조절 칸을 여는 중…'); await runPath(path); }
-        for (let i = 0; i < store.mult; i++) { runAction(act, { fromMacro: true }); await sleep(120); }
+        for (let i = 0; i < store.mult; i++) { runAction(act, { fromMacro: true, reliable: true }); await sleep(120); }
         picOpenAt = Date.now();
       } else if (pt === 'bright') {
         // 메뉴 길이 없으면 밝기 키(USB·블루투스 표준 키)를 바로 보냄. 방향키는 보내지 않음
