@@ -51,6 +51,7 @@ public final class BleManager {
         BluetoothGattCharacteristic cmd, info;
         final ArrayDeque<Op> q = new ArrayDeque<>();
         boolean busy, ready, wanted = true;
+        Op inflight;   // 지금 보내는 중인 것 (실패 응답이 오면 다시 보냄)
         int retries;
         String name = "";
         Conn(String addr) { this.addr = addr; }
@@ -165,14 +166,19 @@ public final class BleManager {
             op = c.q.poll();
             if (op == null) return;
             c.busy = true;
+            c.inflight = op;
         }
         boolean ok;
         try { ok = run(c, op); } catch (Exception e) { ok = false; }
         if (ok) return; // 완료 콜백에서 다음 것을 보냄
+        boolean gaveUp;
         synchronized (c) {
-            c.busy = false;
-            if (++op.tries <= 20) c.q.addFirst(op); // 잠시 뒤 다시 시도, 계속 실패하면 버림
+            c.busy = false; c.inflight = null;
+            // 잠시 뒤 다시 시도. 확인 받는 것(펌웨어 조각 등)은 약 3초까지 버티고, 그래도 안 되면 화면에 알림
+            gaveUp = ++op.tries > (op.reliable ? 200 : 20);
+            if (!gaveUp) c.q.addFirst(op);
         }
+        if (gaveUp && op.reliable && op.kind == OP_WRITE) Hub.emit("onWriteFail", c.addr);
         h.postDelayed(() -> pump(c), 15);
     }
 
@@ -204,8 +210,23 @@ public final class BleManager {
     }
 
     private void done(Conn c) {
-        synchronized (c) { c.busy = false; }
+        synchronized (c) { c.busy = false; c.inflight = null; }
         h.post(() -> pump(c));
+    }
+
+    // 쓰기 응답: 실패면 같은 것을 다시 보냄 (예전엔 실패해도 다음으로 넘어가서 펌웨어 조각이 빠졌음)
+    private void writeDone(Conn c, int status) {
+        Op op;
+        synchronized (c) { op = c.inflight; }
+        if (status == BluetoothGatt.GATT_SUCCESS || op == null || !op.reliable) { done(c); return; }
+        boolean gaveUp;
+        synchronized (c) {
+            c.busy = false; c.inflight = null;
+            gaveUp = ++op.tries > 20;
+            if (!gaveUp) c.q.addFirst(op);
+        }
+        if (gaveUp) Hub.emit("onWriteFail", c.addr);
+        h.postDelayed(() -> pump(c), 30);
     }
 
     private void onInfo(Conn c, byte[] v) {
@@ -257,7 +278,7 @@ public final class BleManager {
 
         @Override public void onDescriptorWrite(BluetoothGatt g, BluetoothGattDescriptor d, int status) { done(c); }
 
-        @Override public void onCharacteristicWrite(BluetoothGatt g, BluetoothGattCharacteristic ch, int status) { done(c); }
+        @Override public void onCharacteristicWrite(BluetoothGatt g, BluetoothGattCharacteristic ch, int status) { writeDone(c, status); }
 
         // Android 13 이상
         @Override public void onCharacteristicRead(BluetoothGatt g, BluetoothGattCharacteristic ch, byte[] value, int status) {

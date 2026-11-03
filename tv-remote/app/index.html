@@ -1306,6 +1306,7 @@ window.__native = {
     d.logs = (d.logs || []).concat(t + '  ' + msg).slice(-12);
     if (current === d.id) ui.renderSettings();
   },
+  onWriteFail(addr) { const d = dongles.get(addr); if (d) d.writeFail = true; },
   onVolumeKey(dir) { if (window.__clk) window.__clk.count(dir); },
   onShare(j) { share.onState(j); },
   onShareItems(j) { try { share.add(JSON.parse(j)); } catch (e) {} },
@@ -1374,6 +1375,10 @@ const fw = {
     if (this.busy) return;
     if (d.state !== 'on') { ui.toast('동글이 연결된 상태에서만 할 수 있어요.'); return; }
     this.busy = d.id; this.pct = 0; this.stop = false; this.refresh();
+    d.writeFail = false;
+    // 보내는 동안 휴대폰 화면이 꺼지면 전송이 멈추거나 끊길 수 있어서 켜 둠
+    if (NATIVE) try { Native.keepScreenOn(true); } catch (e) {}
+    let begun = false;
     try {
       const r = await fetch(this.latest.url + '?t=' + Date.now(), { cache: 'no-store' });
       if (!r.ok) throw new Error('파일을 받지 못했어요');
@@ -1383,10 +1388,12 @@ const fw = {
       await d.write([OP.OTA_BEGIN, n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >>> 24) & 255], true);
       await sleep(300);
       if (d.otaMsg.startsWith('err')) throw new Error(d.otaMsg.slice(4));
+      begun = true;
       const chunk = Math.max(16, d.payloadMax - 1);
       for (let i = 0; i < n; i += chunk) {
         if (this.stop) { d.write([OP.OTA_ABORT], true); throw new Error('중단했어요'); }
-        if (d.state !== 'on') throw new Error('연결이 끊겼어요');
+        if (d.state !== 'on') throw new Error('연결이 끊겼어요. 동글 가까이에서 다시 시도해 주세요');
+        if (d.writeFail) throw new Error('블루투스로 보내다 빠진 조각이 있어요. 동글 가까이에서 다시 시도해 주세요');
         const part = bin.subarray(i, i + chunk), pkt = new Uint8Array(part.length + 1);
         pkt[0] = OP.OTA_DATA; pkt.set(part, 1);
         if (d.native) { d.write(pkt, true); while (d.pending > 6) await sleep(8); }
@@ -1396,11 +1403,18 @@ const fw = {
         if (d.otaMsg.startsWith('err')) throw new Error(d.otaMsg.slice(4));
       }
       if (d.native) while (d.pending > 0) await sleep(20);
+      if (d.writeFail) throw new Error('블루투스로 보내다 빠진 조각이 있어요. 동글 가까이에서 다시 시도해 주세요');
       await d.write([OP.OTA_END], true);
+      begun = false;
       ui.toast('업데이트 완료! 동글이 다시 시작하고 곧 다시 연결돼요.');
     } catch (e) {
+      // 동글이 반쯤 받은 상태로 남지 않게 중단 신호 (동글은 원래 펌웨어 그대로)
+      if (begun && d.state === 'on') try { d.write([OP.OTA_ABORT], true); } catch (_) {}
       ui.toast('펌웨어 업데이트 실패: ' + (e.message || e));
-    } finally { this.busy = null; setTimeout(() => this.refresh(), 300); }
+    } finally {
+      this.busy = null; setTimeout(() => this.refresh(), 300);
+      if (NATIVE) try { Native.keepScreenOn(nativeWake); } catch (e) {}
+    }
   },
 };
 
