@@ -159,10 +159,6 @@ details.more .grid { margin-top: 12px; }
   background: linear-gradient(180deg, var(--key-hi), var(--key)); font-weight: 800; font-size: 17px; color: var(--accent-2);
 }
 .hanpill.ko { color: var(--accent-ink); background: var(--grad); border-color: transparent; }
-.typekeys { display: grid; grid-template-columns: 1.2fr 1.3fr 1fr 1fr 0.9fr; gap: 6px; }
-.typekeys .key { min-height: 40px; font-size: 13px; border-radius: 11px; }
-.typekeys .key.ghost { background: transparent; box-shadow: none; border-color: var(--line); color: var(--muted); }
-.typekeys .key svg { width: 18px; height: 18px; }
 .padbox { border: 1px solid var(--line); border-radius: 20px; overflow: hidden; background: var(--panel); }
 .touchpad {
   height: calc(100vh - 380px); min-height: 220px; max-height: 520px;
@@ -299,7 +295,7 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
   #v-remote .log { grid-column: 1 / -1; }
 
   /* 터치패드: 왼쪽 = 글자 입력, 오른쪽 = 패드 */
-  .pad-view > .typebar, .pad-view > .typekeys { grid-column: 1; }
+  .pad-view > .typebar { grid-column: 1; }
   .pad-view > .padbox { grid-row: 1 / span 3; }
   .pad-view .touchpad { height: calc(100vh - 260px); max-height: none; min-height: 200px; }
 
@@ -409,15 +405,8 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
     <!-- 글자 입력: 위쪽에 두어 휴대폰 키보드가 올라와도 가리지 않음 -->
     <div class="typebar">
       <input type="text" id="textIn" placeholder="여기에 치면 TV에 바로 입력" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="TV에 입력할 글자">
-      <button class="hanpill" id="hanBtn" aria-label="한/영 전환">A</button>
+      <button class="hanpill" id="hanBtn" title="한글이 영어로(또는 반대로) 나오면 누르세요">A</button>
       <button class="btn primary" id="textSend">엔터</button>
-    </div>
-    <div class="typekeys">
-      <button class="key" data-kb="42" data-repeat>지우기</button>
-      <button class="key" data-kb="44">띄어쓰기</button>
-      <button class="key" data-kb="41">Esc</button>
-      <button class="key" id="hanFlip" title="한글이 영어로(또는 반대로) 나올 때">한영 반대</button>
-      <button class="key ghost" id="hanMore" aria-label="한/영 설정">설정</button>
     </div>
 
     <!-- 터치패드: 노트북 트랙패드처럼 아래에 클릭 버튼이 붙어 있음 -->
@@ -1056,6 +1045,7 @@ const ui = {
           <dt>동글</dt><dd>${esc(d.devName)} · MTU ${d.mtu}</dd>
           ${d.demo ? '' : `<dt>펌웨어</dt><dd id="fwRow">${fw.rowHtml(d)}</dd>`}
           ${d.diag ? `<dt>진단</dt><dd>${esc(d.diag)}</dd>` : ''}
+          <dt>한/영 전환</dt><dd>${esc(HAN_KEYS[store.hanKey ?? 0][0])} <button class="btn sm" id="hanSetBtn">바꾸기</button></dd>
           ${d.uc !== undefined ? `<dt>USB 방식</dt><dd>${d.uc ? '호환 모드 (키보드만)' : '표준 (키보드·마우스·미디어키)'} <button class="btn sm" id="ucBtn">${d.uc ? '표준으로' : '호환 모드로'}</button></dd>` : ''}
         </dl>
         <label class="label" for="nameIn">이 TV 이름</label>
@@ -1103,6 +1093,7 @@ const ui = {
         </div>
       </div>`;
     fw.bind(d);
+    const hsb = $('#hanSetBtn'); if (hsb) hsb.onclick = () => window.openHanSettings && window.openHanSettings();
     const ucb = $('#ucBtn'); if (ucb) ucb.onclick = () => confirmSheet(d.uc ? '표준 방식으로 바꿀까요?' : '호환 모드로 바꿀까요?',
       d.uc ? '키보드·마우스·미디어키를 모두 쓰는 방식이에요. 대부분의 스마트TV는 이쪽이 맞아요.' : 'TV가 동글을 아예 인식하지 못할 때만 쓰세요. 키보드는 되지만 터치패드(마우스)와 음량·홈 같은 미디어키는 안 될 수 있어요.',
       '바꾸기', () => d.write([OP.USB_COMPAT, d.uc ? 0 : 1], true).then(() => this.toast('동글이 다시 시작해요')).catch(() => this.toast('연결된 상태에서만 할 수 있어요.')));
@@ -1596,7 +1587,7 @@ function bindTouchpad() {
   const renderHan = () => {
     const d = dongles.get(current); const han = d ? !!(store.hanState || {})[d.id] : false;
     const b = $('#hanBtn'); b.textContent = han ? '가' : 'A'; b.classList.toggle('ko', han);
-    b.setAttribute('aria-label', `한/영 전환 (지금 ${han ? '한글' : '영어'})`);
+    b.setAttribute('aria-label', `한/영 맞추기 (앱은 TV가 지금 ${han ? '한글' : '영어'} 상태라고 봄)`);
   };
   const setHan = (d, v) => { store.hanState = store.hanState || {}; store.hanState[d.id] = v; save(); renderHan(); };
   // 한/영이 반대로 나올 때: 앱이 알고 있는 TV 상태만 뒤집음 (TV에는 아무것도 보내지 않음)
@@ -1608,26 +1599,23 @@ function bindTouchpad() {
     ui.toast(`맞췄어요. TV가 지금 ${now ? '한글' : '영어'} 상태라고 보고 입력해요. 다시 쳐 주세요.`);
     $('#textIn').focus();
   };
-  $('#hanFlip').onclick = flipHan;
-
-  $('#hanBtn').onclick = () => sendRaw(d => { sendToggle(d); setHan(d, !(store.hanState || {})[d.id]); });
-  $('#hanMore').onclick = () => {
+  // 한/영 전환은 치는 글자에 맞춰 자동. 가/A 버튼은 결과가 반대로 나올 때 맞추는 용도
+  $('#hanBtn').onclick = flipHan;
+  window.openHanSettings = () => {
     const sel = store.hanKey ?? 0;
     openSheet(`<h3>한/영 설정</h3>
-      <div class="macro"><div class="nm">입력 버튼의 가/A 표시가 TV와 다를 때<small>표시만 바꾸고 TV에는 아무것도 보내지 않아요</small></div><button class="btn sm" data-fix>표시 바꾸기</button></div>
       <span class="label">전환 방법 (TV마다 한 번)</span>
       <p style="margin:0;color:var(--muted);font-size:13px">TV의 글자 입력 칸을 열고 하나씩 ‘시험’하세요. <b style="color:var(--fg)">안녕</b>이 나오면 맞는 방법이에요. <b style="color:var(--fg)">dkssud</b>가 나오면 다음 것을 시험하세요.</p>
       <div class="grid" style="gap:8px">${HAN_KEYS.map(([n], i) => `<div class="macro"><div class="nm">${esc(n)}${i === sel ? ' <span class="cur">사용 중</span>' : ''}</div>
         <button class="btn sm" data-ht="${i}">시험</button><button class="btn sm primary" data-hu="${i}">이걸로</button></div>`).join('')}</div>
       <button class="btn" data-x>닫기</button>`, (s, close) => {
       $('[data-x]', s).onclick = close;
-      $('[data-fix]', s).onclick = () => { close(); flipHan(); };
       $$('[data-ht]', s).forEach(b => b.onclick = () => sendRaw(d => {
         sendToggle(d, +b.dataset.ht);
         for (const k of 'dkssud') d.write([OP.KEY_TAP, 0x04 + k.charCodeAt(0) - 97, 0], true);
         ui.toast('보냈어요. TV 입력 칸을 확인하세요.');
       }));
-      $$('[data-hu]', s).forEach(b => b.onclick = () => { store.hanKey = +b.dataset.hu; save(); close(); ui.toast(`한/영 전환: ${HAN_KEYS[+b.dataset.hu][0]}`); });
+      $$('[data-hu]', s).forEach(b => b.onclick = () => { store.hanKey = +b.dataset.hu; save(); close(); ui.render(); ui.toast(`한/영 전환: ${HAN_KEYS[+b.dataset.hu][0]}`); });
     });
   };
   $$('nav.tabs [data-tab="pad"]').forEach(b => b.addEventListener('click', renderHan));
@@ -1636,7 +1624,7 @@ function bindTouchpad() {
   const live = true; let prev = '';
   const syncLive = () => {
     $('#textSend').textContent = '엔터';
-    $('#textIn').placeholder = '여기에 치면 TV에 바로 입력돼요';
+    $('#textIn').placeholder = '여기에 치면 TV에 바로 입력';
   };
   const BS = 0x2A;
   // 한 글자 → [{k,m,han}] (han: true=한글 모드, false=영어 모드, null=상관없음)
