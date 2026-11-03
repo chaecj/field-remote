@@ -971,13 +971,14 @@ const ui = {
     const box = $('#pathRow'); if (!box) return;
     const d = dongles.get(current), pt = store.picTarget || 'bright', name = pt === 'bright' ? '밝기' : '명암';
     if (!d) { box.className = 'pathrow'; box.innerHTML = '<span class="grow">TV를 먼저 선택해 주세요.</span>'; return; }
-    const path = (cfgOf(d.id).paths || {})[pt];
+    const { path, from } = pathFor(d.id, pt);
     if (recording && recording.target) {
+      const hint = pathHint(cfgOf(d.id).brand, pt);
       box.className = 'pathrow todo';
-      box.innerHTML = `<span class="grow">아래 버튼으로 TV의 <b>${name}</b> 조절 칸까지 이동하세요<small>도착하면 위쪽 ‘여기서 저장’을 누르세요</small></span>`;
+      box.innerHTML = `<span class="grow">아래 버튼으로 TV의 <b>${name}</b> 조절 칸까지 이동하세요<small>${esc(hint)}</small><small>도착하면 위쪽 ‘여기서 저장’을 누르세요</small></span>`;
     } else if (path && path.length) {
       box.className = 'pathrow';
-      box.innerHTML = `<span class="grow">${name} 메뉴 길 저장됨 · ${path.length}단계<small>+/−를 누르면 자동으로 ${name} 칸을 열어요</small></span><button class="btn sm" id="pathRec">다시 저장</button>`;
+      box.innerHTML = `<span class="grow">${name} 메뉴 길 · ${esc(from)} · ${path.length}단계<small>+/−를 누르면 자동으로 ${name} 칸을 열어요</small></span><button class="btn sm" id="pathRec">다시 저장</button>`;
     } else if (pt === 'bright') {
       box.className = 'pathrow';
       box.innerHTML = `<span class="grow">밝기 키로 바로 조절해요<small>TV가 반응하지 않으면 밝기 메뉴까지 가는 길을 한 번 저장하세요</small></span><button class="btn sm" id="pathRec">메뉴 길 저장</button>`;
@@ -1686,10 +1687,47 @@ function bindTouchpad() {
 }
 
 let picOpenAt = 0;   // 마지막으로 밝기 칸을 조작한 시각 (최근이면 메뉴가 열려 있다고 봄)
+// 메뉴 길은 브랜드별로 같이 씀 (브랜드를 안 고른 TV끼리도 하나로 묶음). 이 TV만 따로 저장한 길이 있으면 그걸 먼저 씀
+const brandKey = (id) => cfgOf(id).brand || '_none';
+const brandName = (id) => { const b = cfgOf(id).brand; return b ? `${BRANDS[b].label} TV` : '브랜드 미선택 TV'; };
+function pathFor(id, pt) {
+  const own = (cfgOf(id).paths || {})[pt];
+  if (own && own.length) return { path: own, from: '이 TV 전용' };
+  const shared = ((store.brandPaths || {})[brandKey(id)] || {})[pt];
+  if (shared && shared.length) return { path: shared, from: `${brandName(id)} 공용` };
+  return { path: null, from: '' };
+}
+// 브랜드별 메뉴 위치 안내 (연식마다 조금 다를 수 있음)
+const PATH_HINTS = {
+  samsung: { bright: '설정(톱니) → 모든 설정 → 화면 → 전문가 설정 → 밝기', contrast: '설정(톱니) → 모든 설정 → 화면 → 전문가 설정 → 명암' },
+  lg: { bright: '설정 → 모든 설정 → 화면 → 화면 모드 설정 → 밝기(백라이트)', contrast: '설정 → 모든 설정 → 화면 → 화면 모드 설정 → 명암' },
+  sony: { bright: '설정 → 디스플레이 및 음향 → 화면 → 밝기', contrast: '설정 → 디스플레이 및 음향 → 화면 → 명암' },
+};
+function pathHint(brand, pt) {
+  const h = PATH_HINTS[brand];
+  if (h) return '보통 ' + h[pt];
+  return `보통 설정 → 화면(영상) → ${pt === 'bright' ? '밝기(백라이트)' : '명암'}`;
+}
 function startPathRec(target) {
   if (!dongles.get(current)) { ui.toast('TV를 먼저 선택해 주세요.'); return; }
-  recording = { steps: [], last: Date.now(), target }; ui.renderRec(); ui.renderMacros();
-  ui.toast('아래 버튼으로 메뉴를 이동하세요. 설정 버튼부터 시작해요.');
+  const name = target === 'bright' ? '밝기' : '명암', brand = cfgOf(current).brand;
+  openSheet(`<h3>${name} 메뉴 길 찾기</h3>
+    <ol class="tips">
+      <li>TV에 <b>메뉴가 하나도 안 열린 상태</b>에서 시작하세요.</li>
+      <li>‘시작’을 누르고 이 화면 아래 버튼(<b>설정 · ▲▼◀▶ · 확인</b>)만으로 이동하세요. TV 리모컨으로 누른 건 기록되지 않아요.</li>
+      <li>${esc(pathHint(brand, target))}</li>
+      <li>TV가 마지막 위치를 기억하기도 해요. 메뉴마다 <b>▲를 넉넉히 눌러 맨 위로 간 뒤</b> 내려가면 다음에도 정확해요.</li>
+      <li>숫자 막대(${name} 조절 칸)가 보이면 위쪽 <b>‘여기서 저장’</b>.</li>
+    </ol>
+    <div class="row"><button class="btn grow" data-x>닫기</button><button class="btn primary grow" data-go>시작</button></div>`,
+    (s, close) => {
+      $('[data-x]', s).onclick = close;
+      $('[data-go]', s).onclick = () => {
+        close();
+        recording = { steps: [], last: Date.now(), target, dev: current }; ui.renderRec(); ui.renderMacros();
+        ui.toast('설정 버튼부터 눌러 이동하세요.');
+      };
+    });
 }
 async function runPath(steps) {
   for (const s of steps) { await sleep(Math.max(250, Math.min(s.wait || 0, 1200))); runAction(s.act, { fromMacro: true }); }
@@ -1708,7 +1746,7 @@ function bindPicture() {
     const d = dongles.get(current); if (!d) { ui.toast('TV를 먼저 선택해 주세요.'); return; }
     busy = true;
     try {
-      const pt = store.picTarget, path = (cfgOf(d.id).paths || {})[pt];
+      const pt = store.picTarget, { path } = pathFor(d.id, pt);
       const up = act === 'right';
       if (path && path.length) {
         // 저장한 메뉴 길로 조절 칸을 연 뒤 ◀/▶
@@ -1721,15 +1759,8 @@ function bindPicture() {
         if (!store.brHint) { store.brHint = 1; save(); ui.toast('밝기 키를 보냈어요. TV가 그대로면 아래 ‘메뉴 길 저장’을 해 주세요.'); }
       } else {
         // 명암은 표준 키가 없어 메뉴 길이 꼭 필요함
-        openSheet(`<h3>명암 메뉴 길 저장</h3>
-          <p>명암은 TV 메뉴 안에서만 바꿀 수 있어요. TV의 명암 조절 칸까지 가는 길을 한 번만 알려 주세요.</p>
-          <ol class="tips">
-            <li>‘저장 시작’을 누르고, 아래 버튼(설정·▲▼◀▶·확인)으로 TV의 <b>명암</b> 조절 칸까지 이동</li>
-            <li>도착하면 위쪽 ‘여기서 저장’</li>
-            <li>이후엔 +/−만 누르면 자동으로 그 칸을 열고 조절해요</li>
-          </ol>
-          <div class="row"><button class="btn grow" data-x>닫기</button><button class="btn primary grow" data-go>저장 시작</button></div>`,
-          (s, close) => { $('[data-x]', s).onclick = close; $('[data-go]', s).onclick = () => { close(); startPathRec('contrast'); }; });
+        ui.toast('명암은 TV 메뉴로만 바꿀 수 있어요. 메뉴 길을 한 번 저장해 주세요.');
+        startPathRec('contrast');
       }
     } finally { busy = false; }
   };
@@ -1740,10 +1771,26 @@ function bindPicture() {
   $('#recStop').onclick = () => {
     const rec = recording; recording = null; ui.renderRec();
     if (!rec || !rec.steps.length) { ui.toast('누른 버튼이 없어요.'); ui.renderMacros(); return; }
-    const c = cfgOf(current); c.paths = c.paths || {};
-    c.paths[rec.target] = rec.steps; save();
+    const id = rec.dev || current, c = cfgOf(id), name = rec.target === 'bright' ? '밝기' : '명암', group = brandName(id);
     picOpenAt = Date.now();   // 지금 그 칸에 있음
-    ui.renderMacros(); ui.toast(`${rec.target === 'bright' ? '밝기' : '명암'} 메뉴 길을 저장했어요. 이제 +/−만 누르면 돼요.`);
+    const done = (shared) => {
+      c.paths = c.paths || {};
+      if (shared) {
+        store.brandPaths = store.brandPaths || {};
+        const bp = store.brandPaths[brandKey(id)] = store.brandPaths[brandKey(id)] || {};
+        bp[rec.target] = rec.steps; delete c.paths[rec.target];
+      } else c.paths[rec.target] = rec.steps;
+      save(); ui.renderMacros();
+      ui.toast(`${name} 메뉴 길을 ${shared ? group + ' 모두에' : '이 TV에만'} 저장했어요. 이제 +/−만 누르면 돼요.`);
+    };
+    openSheet(`<h3>${name} 메뉴 길 저장</h3>
+      <p>같은 브랜드 TV는 메뉴가 거의 같아요. 기종이 다른 TV만 그 TV에서 ‘이 TV만’으로 다시 저장하면 돼요.</p>
+      <div class="row"><button class="btn grow" data-one>이 TV만</button><button class="btn primary grow" data-all>${esc(group)} 모두</button></div>`,
+      (s, close) => {
+        $('[data-one]', s).onclick = () => { close(); done(false); };
+        $('[data-all]', s).onclick = () => { close(); done(true); };
+        $('.scrim').onclick = () => { close(); done(true); };   // 바깥을 눌러도 공용으로 저장
+      });
   };
   $('#tipBtn').onclick = () => openSheet(`<h3>카메라 플리커 줄이는 법</h3>
     <ul class="tips">
