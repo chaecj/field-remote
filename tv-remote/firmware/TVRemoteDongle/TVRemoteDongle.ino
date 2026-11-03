@@ -57,7 +57,7 @@ static const int PIN_IR  = 4;   // 내장 IR LED
 static const int PIN_LED = 35;  // RGB LED (WS2812)
 static const int PIN_BTN = 41;  // 윗면 버튼
 
-static const char *FW_VERSION = "1.1.2";
+static const char *FW_VERSION = "1.2.0";
 
 // ---------------- BLE UUID ----------------
 #define SVC_UUID  "7e1a0001-5c2b-4f3a-9e7d-3c1b8a9f0a11"
@@ -86,13 +86,19 @@ enum : uint8_t {
   C_IDENTIFY = 0x40,
   C_SET_NAME = 0x41, // [utf8...]
   C_BT_FORGET = 0x42, // 블루투스 키보드 연결 기록 지우기
+  C_USB_COMPAT = 0x43, // [0=표준, 1=호환] 저장 후 다시 시작
 };
 
 // ---------------- 전역 ----------------
-USBHIDKeyboard Keyboard;
-USBHIDMouse Mouse;
-USBHIDConsumerControl Consumer;
-USBHIDSystemControl SystemCtl;
+// USB 장치는 setup에서 만듦: 먼저 만든 쪽이 USB 인터페이스 종류를 정함
+//  - 기본(표준 모드): 일반 HID → TV가 키보드·마우스·미디어키를 모두 인식 (TV 마우스 커서 필요)
+//  - 호환 모드: 부트 키보드 → 오래된 TV·BIOS도 키보드로 인식하지만 마우스·미디어키는 안 될 수 있음
+USBHIDKeyboard *kbd;
+USBHIDMouse *mouse;
+USBHIDConsumerControl *consumer;
+USBHIDSystemControl *sysctl;
+USBHID *hidBase;
+bool usbCompat = false;
 Preferences prefs;
 
 BLEServer *server = nullptr;
@@ -139,7 +145,7 @@ void publishInfo() {
   String j = "{\"n\":\"" + devName + "\",\"v\":\"" + FW_VERSION + "\",\"usb\":" +
              (usbReady() ? "true" : "false") + ",\"bt\":" + String(btHostCount()) +
              ",\"mtu\":" + String(peerMtu) + ",\"btn\":" + String(btnCount) +
-             ",\"d\":\"" + diag + "\"}";
+             ",\"uc\":" + String(usbCompat ? 1 : 0) + ",\"d\":\"" + diag + "\"}";
   infoChar->setValue(j.c_str());
   if (phoneConnected()) infoChar->notify();
 }
@@ -239,7 +245,7 @@ void btMouseSend(int8_t x, int8_t y, int8_t w) {
 
 // ---------------- 키 입력 (USB + 블루투스 동시) ----------------
 void kPress(uint8_t k) {
-  Keyboard.pressRaw(k);
+  kbd->pressRaw(k);
   if (k >= 0xE0 && k < 0xE8) btMods |= 1 << (k - 0xE0);
   else {
     for (int i = 0; i < 6; i++) if (btKeys[i] == k) { btKbSend(); return; }
@@ -248,13 +254,13 @@ void kPress(uint8_t k) {
   btKbSend();
 }
 void kRelease(uint8_t k) {
-  Keyboard.releaseRaw(k);
+  kbd->releaseRaw(k);
   if (k >= 0xE0 && k < 0xE8) btMods &= ~(1 << (k - 0xE0));
   else for (int i = 0; i < 6; i++) if (btKeys[i] == k) btKeys[i] = 0;
   btKbSend();
 }
 void kReleaseAll() {
-  Keyboard.releaseAll();
+  kbd->releaseAll();
   btMods = 0; memset(btKeys, 0, 6);
   btKbSend();
 }
@@ -290,16 +296,16 @@ void typeChar(char c) {
 }
 
 void ccTap(uint16_t u) {
-  Consumer.press(u); btCcSend(u);
+  consumer->press(u); btCcSend(u);
   delay(30);
-  Consumer.release(); btCcSend(0);
+  consumer->release(); btCcSend(0);
 }
 void mouseMove(int8_t x, int8_t y, int8_t w, int8_t pan) {
-  Mouse.move(x, y, w, pan);
+  mouse->move(x, y, w, pan);
   btMouseSend(x, y, w);
 }
-void mousePress(uint8_t b) { Mouse.press(b); btMouseBtn |= b; btMouseSend(0, 0, 0); }
-void mouseRelease(uint8_t b) { Mouse.release(b); btMouseBtn &= ~b; btMouseSend(0, 0, 0); }
+void mousePress(uint8_t b) { mouse->press(b); btMouseBtn |= b; btMouseSend(0, 0, 0); }
+void mouseRelease(uint8_t b) { mouse->release(b); btMouseBtn &= ~b; btMouseSend(0, 0, 0); }
 void mouseClick(uint8_t b) { mousePress(b); delay(20); mouseRelease(b); }
 
 // ---------------- IR 송신 ----------------
@@ -362,7 +368,7 @@ void handle(const Msg &m) {
     case C_KEY_DOWN: if (pn >= 1) kPress(p[0]); break;
     case C_KEY_UP: if (pn >= 1) kRelease(p[0]); break;
     case C_KEY_ALLUP:
-      kReleaseAll(); Consumer.release(); btCcSend(0); mouseRelease(0x1F);
+      kReleaseAll(); consumer->release(); btCcSend(0); mouseRelease(0x1F);
       break;
     case C_TEXT:
       for (size_t i = 0; i < pn; i++) { typeChar((char)p[i]); delay(5); }
@@ -375,11 +381,11 @@ void handle(const Msg &m) {
     case C_MOUSE_UP: mouseRelease(pn ? p[0] : MOUSE_LEFT); break;
     case C_CC_TAP: if (pn >= 2) ccTap((uint16_t)p[0] | ((uint16_t)p[1] << 8)); break;
     case C_CC_DOWN:
-      if (pn >= 2) { uint16_t u = (uint16_t)p[0] | ((uint16_t)p[1] << 8); Consumer.press(u); btCcSend(u); }
+      if (pn >= 2) { uint16_t u = (uint16_t)p[0] | ((uint16_t)p[1] << 8); consumer->press(u); btCcSend(u); }
       break;
-    case C_CC_UP: Consumer.release(); btCcSend(0); break;
+    case C_CC_UP: consumer->release(); btCcSend(0); break;
     case C_SYSTEM:
-      if (pn >= 1) { SystemCtl.press(p[0]); delay(30); SystemCtl.release(); }
+      if (pn >= 1) { sysctl->press(p[0]); delay(30); sysctl->release(); }
       break;
     case C_IR:
       if (pn >= 4) { irHeader(p); irAppend(p + 4, pn - 4); irSend(); }
@@ -399,6 +405,11 @@ void handle(const Msg &m) {
       ESP.restart();
       break;
     }
+    case C_USB_COMPAT:
+      prefs.putBool("usbcompat", pn >= 1 && p[0] == 1);
+      delay(100);
+      ESP.restart();
+      break;
     case C_BT_FORGET:
       ble_store_clear();
       delay(100);
@@ -466,12 +477,18 @@ void setup() {
 
   // USB: 키보드 + 마우스 + 미디어키 + 시스템키
   stage(2);
+  usbCompat = prefs.getBool("usbcompat", false);
+  if (!usbCompat) hidBase = new USBHID(HID_ITF_PROTOCOL_NONE);   // 인터페이스를 일반 HID로 고정
+  kbd = new USBHIDKeyboard();
+  mouse = new USBHIDMouse();
+  consumer = new USBHIDConsumerControl();
+  sysctl = new USBHIDSystemControl();
   USB.productName("HW Remote");
   USB.manufacturerName("CHAEUM");
-  Keyboard.begin();
-  Mouse.begin();
-  Consumer.begin();
-  SystemCtl.begin();
+  kbd->begin();
+  mouse->begin();
+  consumer->begin();
+  sysctl->begin();
   USB.begin();
 
   // BLE

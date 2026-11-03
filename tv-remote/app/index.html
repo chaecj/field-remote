@@ -526,7 +526,7 @@ const SVC  = '7e1a0001-5c2b-4f3a-9e7d-3c1b8a9f0a11';
 const CMD  = '7e1a0002-5c2b-4f3a-9e7d-3c1b8a9f0a11';
 const INFO = '7e1a0003-5c2b-4f3a-9e7d-3c1b8a9f0a11';
 const OP = { KEY_TAP:0x01, KEY_ALLUP:0x04, TEXT:0x05, MOVE:0x06, CLICK:0x07, MDOWN:0x08, MUP:0x09,
-             CC_TAP:0x0A, SYS:0x0D, IR:0x20, IR_BEGIN:0x30, IR_DATA:0x31, IR_END:0x32, IDENTIFY:0x40, SET_NAME:0x41, BT_FORGET:0x42 };
+             CC_TAP:0x0A, SYS:0x0D, IR:0x20, IR_BEGIN:0x30, IR_DATA:0x31, IR_END:0x32, IDENTIFY:0x40, SET_NAME:0x41, BT_FORGET:0x42, USB_COMPAT:0x43 };
 
 /* ---------------- IR 인코더 ---------------- */
 function pdm(hdr, bytes, bitMark, one, zero) {
@@ -709,7 +709,7 @@ class Dongle {
   }
   onInfo(dv) {
     let j; try { j = JSON.parse(typeof dv === 'string' ? dv : dec.decode(dv)); } catch (e) { return; }
-    this.devName = j.n || this.devName; this.fw = j.v || ''; this.usb = !!j.usb; this.bt = j.bt || 0; this.diag = j.d || '';
+    this.devName = j.n || this.devName; this.fw = j.v || ''; this.usb = !!j.usb; this.bt = j.bt || 0; this.diag = j.d || ''; this.uc = j.uc;
     this.mtu = Math.max(23, Math.min(517, j.mtu || 23));
     if (this.btn !== null && j.btn !== this.btn) ui.identifyFromButton(this);
     this.btn = j.btn;
@@ -1049,6 +1049,7 @@ const ui = {
           <dt>블루투스 키보드</dt><dd>${d.bt ? d.bt + '대 연결됨' : '연결 안 됨'}</dd>
           <dt>동글</dt><dd>${esc(d.devName)} · v${esc(d.fw || '?')} · MTU ${d.mtu}</dd>
           ${d.diag ? `<dt>진단</dt><dd>${esc(d.diag)}</dd>` : ''}
+          ${d.uc !== undefined ? `<dt>USB 방식</dt><dd>${d.uc ? '호환 모드 (키보드만)' : '표준 (키보드·마우스·미디어키)'} <button class="btn sm" id="ucBtn">${d.uc ? '표준으로' : '호환 모드로'}</button></dd>` : ''}
         </dl>
         <label class="label" for="nameIn">이 TV 이름</label>
         <div class="row"><input type="text" id="nameIn" value="${esc(c.name)}" placeholder="예: 거실 TV, 사무실 모니터">
@@ -1094,6 +1095,9 @@ const ui = {
           <button class="btn danger grow" id="forgetBtn">목록에서 삭제</button>
         </div>
       </div>`;
+    const ucb = $('#ucBtn'); if (ucb) ucb.onclick = () => confirmSheet(d.uc ? '표준 방식으로 바꿀까요?' : '호환 모드로 바꿀까요?',
+      d.uc ? '키보드·마우스·미디어키를 모두 쓰는 방식이에요. 대부분의 스마트TV는 이쪽이 맞아요.' : 'TV가 동글을 아예 인식하지 못할 때만 쓰세요. 키보드는 되지만 터치패드(마우스)와 음량·홈 같은 미디어키는 안 될 수 있어요.',
+      '바꾸기', () => d.write([OP.USB_COMPAT, d.uc ? 0 : 1], true).then(() => this.toast('동글이 다시 시작해요')).catch(() => this.toast('연결된 상태에서만 할 수 있어요.')));
     const idb = $('#identBtn'); if (idb) idb.onclick = () => d.write([OP.IDENTIFY]).catch(() => this.toast('연결된 상태에서만 할 수 있어요.'));
     $('#nameSave').onclick = () => { c.name = $('#nameIn').value.trim(); save(); this.render(); this.toast('이름을 저장했어요'); };
     $('#brandSel').onchange = (e) => { c.brand = e.target.value || null; save(); this.toast(c.brand ? `${BRANDS[c.brand].label} 코드를 씁니다` : 'USB만 사용합니다'); };
