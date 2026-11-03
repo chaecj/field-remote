@@ -526,7 +526,8 @@ const SVC  = '7e1a0001-5c2b-4f3a-9e7d-3c1b8a9f0a11';
 const CMD  = '7e1a0002-5c2b-4f3a-9e7d-3c1b8a9f0a11';
 const INFO = '7e1a0003-5c2b-4f3a-9e7d-3c1b8a9f0a11';
 const OP = { KEY_TAP:0x01, KEY_ALLUP:0x04, TEXT:0x05, MOVE:0x06, CLICK:0x07, MDOWN:0x08, MUP:0x09,
-             CC_TAP:0x0A, SYS:0x0D, IR:0x20, IR_BEGIN:0x30, IR_DATA:0x31, IR_END:0x32, IDENTIFY:0x40, SET_NAME:0x41, BT_FORGET:0x42, USB_COMPAT:0x43 };
+             CC_TAP:0x0A, SYS:0x0D, IR:0x20, IR_BEGIN:0x30, IR_DATA:0x31, IR_END:0x32, IDENTIFY:0x40, SET_NAME:0x41, BT_FORGET:0x42, USB_COMPAT:0x43,
+             OTA_BEGIN:0x50, OTA_DATA:0x51, OTA_END:0x52, OTA_ABORT:0x53 };
 
 /* ---------------- IR 인코더 ---------------- */
 function pdm(hdr, bytes, bitMark, one, zero) {
@@ -709,7 +710,7 @@ class Dongle {
   }
   onInfo(dv) {
     let j; try { j = JSON.parse(typeof dv === 'string' ? dv : dec.decode(dv)); } catch (e) { return; }
-    this.devName = j.n || this.devName; this.fw = j.v || ''; this.usb = !!j.usb; this.bt = j.bt || 0; this.diag = j.d || ''; this.uc = j.uc;
+    this.devName = j.n || this.devName; this.fw = j.v || ''; this.usb = !!j.usb; this.bt = j.bt || 0; this.diag = j.d || ''; this.uc = j.uc; this.otaMsg = j.o || '';
     this.mtu = Math.max(23, Math.min(517, j.mtu || 23));
     if (this.btn !== null && j.btn !== this.btn) ui.identifyFromButton(this);
     this.btn = j.btn;
@@ -1047,7 +1048,8 @@ const ui = {
           <dt>연결</dt><dd>${d.state === 'on' ? '연결됨' : d.state === 'wait' ? '연결 중' : '끊김'}</dd>
           <dt>USB</dt><dd>${d.usb ? '키보드·마우스로 인식됨' : '인식 안 됨 (꽂은 기기 전원·포트 확인)'}</dd>
           <dt>블루투스 키보드</dt><dd>${d.bt ? d.bt + '대 연결됨' : '연결 안 됨'}</dd>
-          <dt>동글</dt><dd>${esc(d.devName)} · v${esc(d.fw || '?')} · MTU ${d.mtu}</dd>
+          <dt>동글</dt><dd>${esc(d.devName)} · MTU ${d.mtu}</dd>
+          ${d.demo ? '' : `<dt>펌웨어</dt><dd id="fwRow">${fw.rowHtml(d)}</dd>`}
           ${d.diag ? `<dt>진단</dt><dd>${esc(d.diag)}</dd>` : ''}
           ${d.uc !== undefined ? `<dt>USB 방식</dt><dd>${d.uc ? '호환 모드 (키보드만)' : '표준 (키보드·마우스·미디어키)'} <button class="btn sm" id="ucBtn">${d.uc ? '표준으로' : '호환 모드로'}</button></dd>` : ''}
         </dl>
@@ -1095,6 +1097,7 @@ const ui = {
           <button class="btn danger grow" id="forgetBtn">목록에서 삭제</button>
         </div>
       </div>`;
+    fw.bind(d);
     const ucb = $('#ucBtn'); if (ucb) ucb.onclick = () => confirmSheet(d.uc ? '표준 방식으로 바꿀까요?' : '호환 모드로 바꿀까요?',
       d.uc ? '키보드·마우스·미디어키를 모두 쓰는 방식이에요. 대부분의 스마트TV는 이쪽이 맞아요.' : 'TV가 동글을 아예 인식하지 못할 때만 쓰세요. 키보드는 되지만 터치패드(마우스)와 음량·홈 같은 미디어키는 안 될 수 있어요.',
       '바꾸기', () => d.write([OP.USB_COMPAT, d.uc ? 0 : 1], true).then(() => this.toast('동글이 다시 시작해요')).catch(() => this.toast('연결된 상태에서만 할 수 있어요.')));
@@ -1372,6 +1375,69 @@ const upd = {
   onProgress(pct) {
     if (pct >= 100) this.show('설치 화면이 뜨면 <b>업데이트</b>를 눌러 주세요.', '');
     else this.show(`새 버전을 내려받는 중… ${pct}%`, '');
+  },
+};
+
+/* ---------------- 동글 무선 펌웨어 업데이트 ---------------- */
+const fw = {
+  URL: 'https://raw.githubusercontent.com/chaecj/field-remote/main/tv-remote/firmware/latest.json',
+  latest: null, busy: null, pct: 0, checking: false,
+  newer(a, b) { const x = String(a || '0').split('.').map(Number), y = String(b || '0').split('.').map(Number);
+    for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; },
+  async check() {
+    if (this.checking) return; this.checking = true;
+    try { const r = await fetch(this.URL + '?t=' + Date.now(), { cache: 'no-store' }); if (r.ok) this.latest = await r.json(); } catch (e) {}
+    this.checking = false; this.refresh();
+  },
+  rowHtml(d) {
+    const cur = d.fw || '?';
+    if (this.busy === d.id) return `v${esc(cur)} · <b id="fwPct">보내는 중 ${this.pct}%</b> <button class="btn sm" id="fwStop">중단</button>`;
+    if (d.otaMsg && d.otaMsg.startsWith('err')) return `v${esc(cur)} · 업데이트 실패 (${esc(d.otaMsg.slice(4))}) <button class="btn sm primary" id="fwGo">다시 시도</button>`;
+    if (!this.latest) return `v${esc(cur)}`;
+    if (d.state === 'on' && this.newer(this.latest.version, cur)) {
+      const old = !d.fw || this.newer('1.3.0', cur);
+      return old ? `v${esc(cur)} · 새 버전 ${esc(this.latest.version)}은 PC로 한 번 넣어야 해요 (이후부터 무선 업데이트)`
+                 : `v${esc(cur)} → <b>${esc(this.latest.version)}</b> <button class="btn sm primary" id="fwGo">무선 업데이트</button>`;
+    }
+    return `v${esc(cur)} · 최신`;
+  },
+  refresh() { const d = dongles.get(current), row = $('#fwRow'); if (d && row) { row.innerHTML = this.rowHtml(d); this.bind(d); } },
+  bind(d) {
+    const go = $('#fwGo'); if (go) go.onclick = () => this.update(d);
+    const st = $('#fwStop'); if (st) st.onclick = () => { this.stop = true; };
+    if (!this.latest && !this.checking) this.check();
+  },
+  async update(d) {
+    if (this.busy) return;
+    if (d.state !== 'on') { ui.toast('동글이 연결된 상태에서만 할 수 있어요.'); return; }
+    this.busy = d.id; this.pct = 0; this.stop = false; this.refresh();
+    try {
+      const r = await fetch(this.latest.url + '?t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) throw new Error('파일을 받지 못했어요');
+      const bin = new Uint8Array(await r.arrayBuffer());
+      if (this.latest.size && bin.length !== this.latest.size) throw new Error('받은 파일 크기가 달라요');
+      const n = bin.length;
+      await d.write([OP.OTA_BEGIN, n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >>> 24) & 255], true);
+      await sleep(300);
+      if (d.otaMsg.startsWith('err')) throw new Error(d.otaMsg.slice(4));
+      const chunk = Math.max(16, d.payloadMax - 1);
+      for (let i = 0; i < n; i += chunk) {
+        if (this.stop) { d.write([OP.OTA_ABORT], true); throw new Error('중단했어요'); }
+        if (d.state !== 'on') throw new Error('연결이 끊겼어요');
+        const part = bin.subarray(i, i + chunk), pkt = new Uint8Array(part.length + 1);
+        pkt[0] = OP.OTA_DATA; pkt.set(part, 1);
+        if (d.native) { d.write(pkt, true); while (d.pending > 6) await sleep(8); }
+        else await d.write(pkt, true);
+        const pct = Math.floor((i + part.length) * 100 / n);
+        if (pct !== this.pct) { this.pct = pct; const el = $('#fwPct'); if (el) el.textContent = `보내는 중 ${pct}%`; }
+        if (d.otaMsg.startsWith('err')) throw new Error(d.otaMsg.slice(4));
+      }
+      if (d.native) while (d.pending > 0) await sleep(20);
+      await d.write([OP.OTA_END], true);
+      ui.toast('업데이트 완료! 동글이 다시 시작하고 곧 다시 연결돼요.');
+    } catch (e) {
+      ui.toast('펌웨어 업데이트 실패: ' + (e.message || e));
+    } finally { this.busy = null; setTimeout(() => this.refresh(), 300); }
   },
 };
 

@@ -18,6 +18,7 @@
 
 #include <Arduino.h>
 #include <Preferences.h>
+#include <Update.h>
 
 #if ARDUINO_USB_MODE
 #error "도구(Tools) > USB Mode 를 'USB-OTG (TinyUSB)' 로 바꾼 뒤 다시 컴파일하세요."
@@ -50,6 +51,10 @@ RTC_NOINIT_ATTR uint32_t rtcMagic, rtcStage, rtcCrashes;
 static const uint32_t RTC_MAGIC = 0x48575243;
 static inline void stage(uint8_t s) { rtcStage = s; }
 String diag;        // 휴대폰 앱에 보여 줄 진단 문구
+// 무선 업데이트 상태
+bool otaOk = false;
+uint32_t otaGot = 0, otaSize = 0;
+String otaMsg = "";
 bool noHid = false; // 안전 모드: 블루투스 키보드 기능 끔
 
 // ---------------- 하드웨어 ----------------
@@ -57,7 +62,7 @@ static const int PIN_IR  = 4;   // 내장 IR LED
 static const int PIN_LED = 35;  // RGB LED (WS2812)
 static const int PIN_BTN = 41;  // 윗면 버튼
 
-static const char *FW_VERSION = "1.2.0";
+static const char *FW_VERSION = "1.3.0";
 
 // ---------------- BLE UUID ----------------
 #define SVC_UUID  "7e1a0001-5c2b-4f3a-9e7d-3c1b8a9f0a11"
@@ -87,6 +92,11 @@ enum : uint8_t {
   C_SET_NAME = 0x41, // [utf8...]
   C_BT_FORGET = 0x42, // 블루투스 키보드 연결 기록 지우기
   C_USB_COMPAT = 0x43, // [0=표준, 1=호환] 저장 후 다시 시작
+  // 무선 펌웨어 업데이트 (휴대폰 앱 → 블루투스)
+  C_OTA_BEGIN = 0x50,  // [크기 u32 LE]
+  C_OTA_DATA = 0x51,   // [바이트...]
+  C_OTA_END = 0x52,
+  C_OTA_ABORT = 0x53,
 };
 
 // ---------------- 전역 ----------------
@@ -145,7 +155,7 @@ void publishInfo() {
   String j = "{\"n\":\"" + devName + "\",\"v\":\"" + FW_VERSION + "\",\"usb\":" +
              (usbReady() ? "true" : "false") + ",\"bt\":" + String(btHostCount()) +
              ",\"mtu\":" + String(peerMtu) + ",\"btn\":" + String(btnCount) +
-             ",\"uc\":" + String(usbCompat ? 1 : 0) + ",\"d\":\"" + diag + "\"}";
+             ",\"uc\":" + String(usbCompat ? 1 : 0) + ",\"o\":\"" + otaMsg + "\",\"d\":\"" + diag + "\"}";
   infoChar->setValue(j.c_str());
   if (phoneConnected()) infoChar->notify();
 }
@@ -188,7 +198,8 @@ class CmdCB : public BLECharacteristicCallbacks {
     if (n == 0 || n > MAX_MSG) return;
     m.len = n;
     memcpy(m.d, v.c_str(), n);
-    xQueueSend(cmdQueue, &m, pdMS_TO_TICKS(20));
+    // 펌웨어 조각은 버리면 안 되므로 자리가 날 때까지 기다림 (휴대폰 쪽 전송 속도도 자연히 맞춰짐)
+    xQueueSend(cmdQueue, &m, m.d[0] == 0x51 ? pdMS_TO_TICKS(3000) : pdMS_TO_TICKS(20));
   }
 };
 
@@ -405,6 +416,39 @@ void handle(const Msg &m) {
       ESP.restart();
       break;
     }
+    case C_OTA_BEGIN: {
+      if (pn < 4) break;
+      uint32_t sz = (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+      if (Update.isRunning()) Update.abort();
+      otaOk = Update.begin(sz);
+      otaGot = 0; otaSize = sz;
+      otaMsg = otaOk ? "receiving" : String("err:begin ") + Update.errorString();
+      led(30, 0, 30);
+      infoDirty = true;
+      return;
+    }
+    case C_OTA_DATA:
+      if (!otaOk || !Update.isRunning()) return;
+      if (Update.write((uint8_t *)p, pn) != pn) { otaOk = false; otaMsg = String("err:write ") + Update.errorString(); infoDirty = true; Update.abort(); }
+      else { otaGot += pn; if ((otaGot / 1024) % 16 == 0) led((otaGot / 1024) % 32 ? 30 : 10, 0, 30); }
+      return;
+    case C_OTA_END:
+      if (otaOk && Update.end(true)) {
+        otaMsg = "ok";
+        publishInfo();
+        for (int i = 0; i < 3; i++) { led(0, 30, 0); delay(150); led(0, 0, 0); delay(150); }
+        delay(300);
+        ESP.restart();
+      } else {
+        otaMsg = String("err:end ") + Update.errorString();
+        if (Update.isRunning()) Update.abort();
+        otaOk = false; infoDirty = true; ledBase();
+      }
+      return;
+    case C_OTA_ABORT:
+      if (Update.isRunning()) Update.abort();
+      otaOk = false; otaMsg = ""; infoDirty = true; ledBase();
+      return;
     case C_USB_COMPAT:
       prefs.putBool("usbcompat", pn >= 1 && p[0] == 1);
       delay(100);
