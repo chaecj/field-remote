@@ -30,8 +30,10 @@ USB 연장선을 쓰면 동글을 TV 앞쪽 아래(리모컨 수신부 근처)�
 1. PC에서 **크롬**으로 <https://espressif.github.io/esptool-js/> 를 엽니다.
 2. AtomS3 Lite의 **리셋 버튼(옆면)을 2초간 눌러** 안쪽 초록 LED가 켜지면 손을 뗍니다. (다운로드 모드)
 3. USB-C 케이블로 PC에 연결하고 **Connect** → 목록에서 포트 선택.
-4. **Flash Address 칸의 기본값 `0x1000`을 반드시 `0x0`으로 바꾸고**, 파일은 `firmware/TVRemoteDongle.merged.bin` 을 선택해 **Program**. (0x1000으로 쓰면 LED가 켜지지 않음. 그때는 Erase Flash 후 0x0으로 다시 쓰기)
-5. 끝나면 케이블을 뺐다 다시 꽂습니다. LED가 **파란색**이면 성공.
+4. **Erase Flash**를 먼저 누르고 끝날 때까지 기다립니다 (1분쯤). 남은 찌꺼기 때문에 안 켜지는 일을 막아 줍니다.
+5. **Flash Address 칸의 기본값 `0x1000`을 반드시 `0x0`으로 바꾸고**, 파일은 `firmware/TVRemoteDongle.merged.bin` 을 선택해 **Program**. 아래 기록에 `Hash of data verified`가 나오면 잘 써진 것. (0x1000으로 쓰면 LED가 전혀 켜지지 않음 → 4번부터 다시)
+6. 버튼을 건드리지 말고 케이블을 뺐다 다시 꽂습니다. LED가 **파란색**(휴대폰 앱이 연결되면 초록, TV까지 인식하면 청록)이면 성공.
+7. 유선으로 구우면 동글 이름과 블루투스 연결 기록이 지워집니다. 휴대폰 블루투스 설정에 `HW-xxxx`가 등록돼 있으면 **등록 해제**하고, 전자칠판 등은 다시 페어링하세요.
 
 ### 방법 B: Arduino IDE
 1. 보드 매니저에서 **esp32 by Espressif (3.3 이상)** 설치.
