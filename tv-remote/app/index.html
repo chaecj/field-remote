@@ -513,7 +513,7 @@ const CMD  = '7e1a0002-5c2b-4f3a-9e7d-3c1b8a9f0a11';
 const INFO = '7e1a0003-5c2b-4f3a-9e7d-3c1b8a9f0a11';
 const OP = { KEY_TAP:0x01, KEY_ALLUP:0x04, TEXT:0x05, MOVE:0x06, CLICK:0x07, MDOWN:0x08, MUP:0x09,
              CC_TAP:0x0A, SYS:0x0D, IR:0x20, IR_BEGIN:0x30, IR_DATA:0x31, IR_END:0x32, IDENTIFY:0x40, SET_NAME:0x41, BT_FORGET:0x42, USB_COMPAT:0x43,
-             OTA_BEGIN:0x50, OTA_DATA:0x51, OTA_END:0x52, OTA_ABORT:0x53 };
+             OTA_BEGIN:0x50, OTA_DATA:0x51, OTA_END:0x52, OTA_ABORT:0x53, OTA_DATA2:0x54 };
 
 /* ---------------- IR 인코더 ---------------- */
 function pdm(hdr, bytes, bitMark, one, zero) {
@@ -1353,10 +1353,17 @@ const fw = {
     try { const r = await fetch(this.URL + '?t=' + Date.now(), { cache: 'no-store' }); if (r.ok) this.latest = await r.json(); } catch (e) {}
     this.checking = false; this.refresh();
   },
+  // 동글이 알려 준 실패 이유를 쉬운 말로 (원래 펌웨어는 그대로 남아 있음)
+  why(msg) {
+    const m = String(msg || '').replace(/^err:/, '');
+    if (/^(busy|gap|size)/.test(m)) return '중간에 빠진 조각이 있어요. 동글 가까이에서 다시 시도해 주세요';
+    if (/^begin/.test(m)) return '동글이 받을 준비를 못 했어요. 동글을 뺐다 꽂고 다시 시도해 주세요';
+    return m;
+  },
   rowHtml(d) {
     const cur = d.fw || '?';
     if (this.busy === d.id) return `v${esc(cur)} · <b id="fwPct">보내는 중 ${this.pct}%</b> <button class="btn sm" id="fwStop">중단</button>`;
-    if (d.otaMsg && d.otaMsg.startsWith('err')) return `v${esc(cur)} · 업데이트 실패 (${esc(d.otaMsg.slice(4))}) <button class="btn sm primary" id="fwGo">다시 시도</button>`;
+    if (d.otaMsg && d.otaMsg.startsWith('err')) return `v${esc(cur)} · 업데이트 실패 (${esc(this.why(d.otaMsg))}) <button class="btn sm primary" id="fwGo">다시 시도</button>`;
     if (!this.latest) return `v${esc(cur)}`;
     if (d.state === 'on' && this.newer(this.latest.version, cur)) {
       const old = !d.fw || this.newer('1.3.0', cur);
@@ -1389,23 +1396,29 @@ const fw = {
       await sleep(300);
       if (d.otaMsg.startsWith('err')) throw new Error(d.otaMsg.slice(4));
       begun = true;
-      const chunk = Math.max(16, d.payloadMax - 1);
+      // 1.5.0 이상 동글: 조각마다 시작 위치를 붙여 보냄 → 동글이 빠진 조각·중복 조각을 스스로 알아챔
+      const v2 = !this.newer('1.5.0', d.fw);
+      const chunk = Math.max(16, d.payloadMax - (v2 ? 5 : 1));
       for (let i = 0; i < n; i += chunk) {
         if (this.stop) { d.write([OP.OTA_ABORT], true); throw new Error('중단했어요'); }
         if (d.state !== 'on') throw new Error('연결이 끊겼어요. 동글 가까이에서 다시 시도해 주세요');
         if (d.writeFail) throw new Error('블루투스로 보내다 빠진 조각이 있어요. 동글 가까이에서 다시 시도해 주세요');
-        const part = bin.subarray(i, i + chunk), pkt = new Uint8Array(part.length + 1);
-        pkt[0] = OP.OTA_DATA; pkt.set(part, 1);
+        const part = bin.subarray(i, i + chunk);
+        let pkt;
+        if (v2) { pkt = new Uint8Array(part.length + 5); pkt[0] = OP.OTA_DATA2; pkt[1] = i & 255; pkt[2] = (i >> 8) & 255; pkt[3] = (i >> 16) & 255; pkt[4] = (i >>> 24) & 255; pkt.set(part, 5); }
+        else { pkt = new Uint8Array(part.length + 1); pkt[0] = OP.OTA_DATA; pkt.set(part, 1); }
         if (d.native) { d.write(pkt, true); while (d.pending > 6) await sleep(8); }
         else await d.write(pkt, true);
         const pct = Math.floor((i + part.length) * 100 / n);
         if (pct !== this.pct) { this.pct = pct; const el = $('#fwPct'); if (el) el.textContent = `보내는 중 ${pct}%`; }
-        if (d.otaMsg.startsWith('err')) throw new Error(d.otaMsg.slice(4));
+        if (d.otaMsg.startsWith('err')) throw new Error(this.why(d.otaMsg));
       }
       if (d.native) while (d.pending > 0) await sleep(20);
       if (d.writeFail) throw new Error('블루투스로 보내다 빠진 조각이 있어요. 동글 가까이에서 다시 시도해 주세요');
       await d.write([OP.OTA_END], true);
       begun = false;
+      await sleep(400);
+      if (d.otaMsg.startsWith('err')) throw new Error(this.why(d.otaMsg));
       ui.toast('업데이트 완료! 동글이 다시 시작하고 곧 다시 연결돼요.');
     } catch (e) {
       // 동글이 반쯤 받은 상태로 남지 않게 중단 신호 (동글은 원래 펌웨어 그대로)

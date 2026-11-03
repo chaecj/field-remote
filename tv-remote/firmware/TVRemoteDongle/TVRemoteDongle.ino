@@ -55,6 +55,7 @@ String diag;        // 휴대폰 앱에 보여 줄 진단 문구
 // 무선 업데이트 상태
 bool otaOk = false;
 uint32_t otaGot = 0, otaSize = 0;
+volatile bool otaDropped = false;   // 대기열이 꽉 차 펌웨어 조각을 못 받은 적이 있음
 String otaMsg = "";
 bool noHid = false; // 안전 모드: 블루투스 키보드 기능 끔
 
@@ -63,7 +64,7 @@ static const int PIN_IR  = 4;   // 내장 IR LED
 static const int PIN_LED = 35;  // RGB LED (WS2812)
 static const int PIN_BTN = 41;  // 윗면 버튼
 
-static const char *FW_VERSION = "1.4.0";
+static const char *FW_VERSION = "1.5.0";
 
 // ---------------- BLE UUID ----------------
 #define SVC_UUID  "7e1a0001-5c2b-4f3a-9e7d-3c1b8a9f0a11"
@@ -98,6 +99,7 @@ enum : uint8_t {
   C_OTA_DATA = 0x51,   // [바이트...]
   C_OTA_END = 0x52,
   C_OTA_ABORT = 0x53,
+  C_OTA_DATA2 = 0x54,  // [시작 위치 u32 LE][바이트...] 위치를 붙여 빠진 조각·중복 조각을 알아챔 (1.5.0부터)
 };
 
 // ---------------- 전역 ----------------
@@ -219,7 +221,8 @@ class CmdCB : public BLECharacteristicCallbacks {
     m.len = n;
     memcpy(m.d, v.c_str(), n);
     // 펌웨어 조각은 버리면 안 되므로 자리가 날 때까지 기다림 (휴대폰 쪽 전송 속도도 자연히 맞춰짐)
-    xQueueSend(cmdQueue, &m, m.d[0] == 0x51 ? pdMS_TO_TICKS(3000) : pdMS_TO_TICKS(20));
+    bool ota = m.d[0] == 0x51 || m.d[0] == 0x54;
+    if (xQueueSend(cmdQueue, &m, ota ? pdMS_TO_TICKS(5000) : pdMS_TO_TICKS(20)) != pdTRUE && ota) otaDropped = true;   // 조용히 버리지 않고 표시
   }
 };
 
@@ -387,6 +390,13 @@ String defaultName() {
 }
 
 // ---------------- 명령 처리 ----------------
+// 무선 업데이트 실패: 받던 것을 버리고 원래 펌웨어 그대로 둠
+void otaFail(const String &msg) {
+  otaOk = false; otaMsg = msg; infoDirty = true;
+  if (Update.isRunning()) Update.abort();
+  ledBase();
+}
+
 void handle(const Msg &m) {
   const uint8_t *d = m.d;
   size_t n = m.len;
@@ -447,19 +457,35 @@ void handle(const Msg &m) {
       uint32_t sz = (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
       if (Update.isRunning()) Update.abort();
       otaOk = Update.begin(sz);
-      otaGot = 0; otaSize = sz;
+      otaGot = 0; otaSize = sz; otaDropped = false;
       otaMsg = otaOk ? "receiving" : String("err:begin ") + Update.errorString();
       led(30, 0, 30);
       infoDirty = true;
       return;
     }
     case C_OTA_DATA:
+    case C_OTA_DATA2: {
       if (!otaOk || !Update.isRunning()) return;
-      if (Update.write((uint8_t *)p, pn) != pn) { otaOk = false; otaMsg = String("err:write ") + Update.errorString(); infoDirty = true; Update.abort(); }
-      else { otaGot += pn; if ((otaGot / 1024) % 16 == 0) led((otaGot / 1024) % 32 ? 30 : 10, 0, 30); }
+      if (otaDropped) { otaFail("err:busy 조각을 놓쳤어요"); return; }
+      const uint8_t *data = p; size_t dn = pn;
+      if (c == C_OTA_DATA2) {
+        if (pn < 4) return;
+        uint32_t off = (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+        data = p + 4; dn = pn - 4;
+        if (off + dn <= otaGot) return;                       // 이미 받은 조각을 다시 보낸 것 → 무시
+        if (off != otaGot) { otaFail(String("err:gap ") + off + "/" + otaGot); return; }   // 중간이 빠짐
+      }
+      if (Update.write((uint8_t *)data, dn) != dn) { otaFail(String("err:write ") + Update.errorString()); return; }
+      otaGot += dn;
+      if ((otaGot / 1024) % 16 == 0) led((otaGot / 1024) % 32 ? 30 : 10, 0, 30);
       return;
+    }
     case C_OTA_END:
-      if (otaOk && Update.end(true)) {
+      if (otaOk && (otaDropped || otaGot != otaSize)) {        // 덜 받았으면 설치하지 않음
+        otaFail(otaDropped ? String("err:busy 조각을 놓쳤어요") : String("err:size ") + otaGot + "/" + otaSize);
+        return;
+      }
+      if (otaOk && Update.end()) {
         otaMsg = "ok";
         publishInfo();
         for (int i = 0; i < 3; i++) { led(0, 30, 0); delay(150); led(0, 0, 0); delay(150); }
