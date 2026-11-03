@@ -1323,6 +1323,14 @@ window.__native = {
     d.logs = (d.logs || []).concat(t + '  ' + msg).slice(-12);
     if (current === d.id) ui.renderSettings();
   },
+  // 연결은 됐는데 동글 정보를 못 읽음 → 앱이 끊고 다시 연결함. 안내는 10초에 한 번만
+  onConnProblem(addr, why) {
+    const d = dongles.get(addr); if (!d) return;
+    const now = Date.now(); if (now - (d._probAt || 0) < 10000) return; d._probAt = now;
+    ui.toast(why === 'bond'
+      ? `휴대폰에 남은 ${d.devName || '동글'} 등록 기록 때문에 막혔어요. 지우고 다시 연결하는 중… 계속 안 되면 휴대폰 블루투스 설정에서 등록 해제해 주세요.`
+      : '동글 정보를 못 받아서 다시 연결하는 중…');
+  },
   onWriteFail(addr) { const d = dongles.get(addr); if (d) d.writeFail = true; },
   onVolumeKey(dir) { if (window.__clk) window.__clk.count(dir); },
   onShare(j) { share.onState(j); },

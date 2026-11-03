@@ -52,6 +52,7 @@ public final class BleManager {
         final ArrayDeque<Op> q = new ArrayDeque<>();
         boolean busy, ready, wanted = true;
         Op inflight;   // 지금 보내는 중인 것 (실패 응답이 오면 다시 보냄)
+        boolean unbondTried;   // 휴대폰에 남은 동글 등록 기록을 지워 봤는지
         int retries;
         String name = "";
         Conn(String addr) { this.addr = addr; }
@@ -113,6 +114,12 @@ public final class BleManager {
     private void open(Conn c, boolean auto) {
         if (!available()) { Hub.emit("onState", c.addr, "offline", c.name); scheduleRetry(c); return; }
         BluetoothDevice dev = adapter.getRemoteDevice(c.addr);
+        // 이 앱은 휴대폰과 동글을 등록(본딩)할 필요가 없음. 등록 기록이 남아 있으면, 동글을 다시 굽거나
+        // 기록을 지웠을 때 열쇠가 어긋나 '연결됨'인데 아무것도 주고받지 못함 → 연결 전에 지움
+        if (!c.unbondTried && bonded(dev)) {
+            c.unbondTried = true;
+            if (removeBond(dev)) { Hub.emit("onState", c.addr, "wait", c.name); h.postDelayed(() -> { if (c.wanted && c.gatt == null) open(c, auto); }, 1200); return; }
+        }
         Hub.emit("onState", c.addr, "wait", c.name);
         try {
             c.gatt = dev.connectGatt(ctx, auto, new Cb(c), BluetoothDevice.TRANSPORT_LE);
@@ -120,6 +127,17 @@ public final class BleManager {
             c.gatt = null;
             Hub.emit("onState", c.addr, "offline", c.name);
         }
+    }
+
+    @SuppressWarnings("MissingPermission")
+    private static boolean bonded(BluetoothDevice d) {
+        try { return d.getBondState() == BluetoothDevice.BOND_BONDED; } catch (Exception e) { return false; }
+    }
+
+    // 숨은 API지만 대부분의 휴대폰에서 동작함. 안 되면 사용자가 블루투스 설정에서 등록 해제
+    private static boolean removeBond(BluetoothDevice d) {
+        try { Object r = d.getClass().getMethod("removeBond").invoke(d); return Boolean.TRUE.equals(r); }
+        catch (Exception e) { return false; }
     }
 
     void disconnect(String addr) {
@@ -288,16 +306,25 @@ public final class BleManager {
 
         // Android 13 이상
         @Override public void onCharacteristicRead(BluetoothGatt g, BluetoothGattCharacteristic ch, byte[] value, int status) {
-            handleRead(value);
+            handleRead(g, value, status);
         }
 
         // Android 12 이하
         @SuppressWarnings("deprecation")
         @Override public void onCharacteristicRead(BluetoothGatt g, BluetoothGattCharacteristic ch, int status) {
-            if (Build.VERSION.SDK_INT < 33) handleRead(ch.getValue());
+            if (Build.VERSION.SDK_INT < 33) handleRead(g, ch.getValue(), status);
         }
 
-        private void handleRead(byte[] value) {
+        private void handleRead(BluetoothGatt g, byte[] value, int status) {
+            // 동글 정보를 못 읽으면 '연결됨'으로 보지 않음 (예전엔 실패해도 연결됨으로 표시해서 버튼이 안 먹혔음)
+            if (status != BluetoothGatt.GATT_SUCCESS || value == null || value.length == 0) {
+                BluetoothDevice dev = g.getDevice();
+                if (bonded(dev)) { c.unbondTried = true; removeBond(dev); }
+                Hub.emit("onConnProblem", c.addr, bonded(dev) ? "bond" : "read");
+                synchronized (c) { c.busy = false; c.inflight = null; }
+                try { g.disconnect(); } catch (Exception ignored) {}   // 끊기면 잠시 뒤 다시 연결함
+                return;
+            }
             onInfo(c, value);
             if (!c.ready) {
                 c.ready = true;
