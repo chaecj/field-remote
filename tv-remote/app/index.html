@@ -651,6 +651,7 @@ const ACTIONS = {
   play: { label: '재생', hid: cc(0xB0) }, pause: { label: '일시정지', hid: cc(0xB1) }, stop: { label: '정지', hid: cc(0xB7) },
   rew: { label: '되감기', hid: cc(0xB4) }, ff: { label: '빨리감기', hid: cc(0xB3) },
   prev: { label: '이전', hid: cc(0xB6) }, next: { label: '다음', hid: cc(0xB5) },
+  brup: { label: '밝기 +', hid: cc(0x6F) }, brdown: { label: '밝기 −', hid: cc(0x70) },
 };
 for (let i = 0; i < 10; i++) ACTIONS['d' + i] = { label: String(i), hid: kb(i === 0 ? 0x27 : 0x1D + i) };
 // 브랜드 IR이 있으면 IR을 먼저 쓰는 버튼 (USB로는 TV마다 반응이 제각각인 것들)
@@ -977,9 +978,12 @@ const ui = {
     } else if (path && path.length) {
       box.className = 'pathrow';
       box.innerHTML = `<span class="grow">${name} 메뉴 길 저장됨 · ${path.length}단계<small>+/−를 누르면 자동으로 ${name} 칸을 열어요</small></span><button class="btn sm" id="pathRec">다시 저장</button>`;
+    } else if (pt === 'bright') {
+      box.className = 'pathrow';
+      box.innerHTML = `<span class="grow">밝기 키로 바로 조절해요<small>TV가 반응하지 않으면 밝기 메뉴까지 가는 길을 한 번 저장하세요</small></span><button class="btn sm" id="pathRec">메뉴 길 저장</button>`;
     } else {
       box.className = 'pathrow todo';
-      box.innerHTML = `<span class="grow"><b>처음 한 번:</b> ${name} 메뉴까지 가는 길 저장<small>TV마다 메뉴가 달라서 한 번만 알려 주면 돼요</small></span><button class="btn sm primary" id="pathRec">저장 시작</button>`;
+      box.innerHTML = `<span class="grow"><b>처음 한 번:</b> 명암 메뉴까지 가는 길 저장<small>명암은 TV 메뉴로만 바꿀 수 있어요. 한 번만 알려 주면 +/−로 조절돼요</small></span><button class="btn sm primary" id="pathRec">저장 시작</button>`;
     }
     const b = $('#pathRec'); if (b) b.onclick = () => startPathRec(pt);
   },
@@ -1704,10 +1708,29 @@ function bindPicture() {
     const d = dongles.get(current); if (!d) { ui.toast('TV를 먼저 선택해 주세요.'); return; }
     busy = true;
     try {
-      const path = (cfgOf(d.id).paths || {})[store.picTarget];
-      if (path && path.length && Date.now() - picOpenAt > 20000) { ui.toast('조절 칸을 여는 중…'); await runPath(path); }
-      for (let i = 0; i < store.mult; i++) { runAction(act, { fromMacro: true }); await sleep(120); }
-      picOpenAt = Date.now();
+      const pt = store.picTarget, path = (cfgOf(d.id).paths || {})[pt];
+      const up = act === 'right';
+      if (path && path.length) {
+        // 저장한 메뉴 길로 조절 칸을 연 뒤 ◀/▶
+        if (Date.now() - picOpenAt > 20000) { ui.toast('조절 칸을 여는 중…'); await runPath(path); }
+        for (let i = 0; i < store.mult; i++) { runAction(act, { fromMacro: true }); await sleep(120); }
+        picOpenAt = Date.now();
+      } else if (pt === 'bright') {
+        // 메뉴 길이 없으면 밝기 키(USB·블루투스 표준 키)를 바로 보냄. 방향키는 보내지 않음
+        for (let i = 0; i < store.mult; i++) { runAction(up ? 'brup' : 'brdown', { fromMacro: true }); await sleep(120); }
+        if (!store.brHint) { store.brHint = 1; save(); ui.toast('밝기 키를 보냈어요. TV가 그대로면 아래 ‘메뉴 길 저장’을 해 주세요.'); }
+      } else {
+        // 명암은 표준 키가 없어 메뉴 길이 꼭 필요함
+        openSheet(`<h3>명암 메뉴 길 저장</h3>
+          <p>명암은 TV 메뉴 안에서만 바꿀 수 있어요. TV의 명암 조절 칸까지 가는 길을 한 번만 알려 주세요.</p>
+          <ol class="tips">
+            <li>‘저장 시작’을 누르고, 아래 버튼(설정·▲▼◀▶·확인)으로 TV의 <b>명암</b> 조절 칸까지 이동</li>
+            <li>도착하면 위쪽 ‘여기서 저장’</li>
+            <li>이후엔 +/−만 누르면 자동으로 그 칸을 열고 조절해요</li>
+          </ol>
+          <div class="row"><button class="btn grow" data-x>닫기</button><button class="btn primary grow" data-go>저장 시작</button></div>`,
+          (s, close) => { $('[data-x]', s).onclick = close; $('[data-go]', s).onclick = () => { close(); startPathRec('contrast'); }; });
+      }
     } finally { busy = false; }
   };
   $('#adjDown').onclick = () => adjust('left');
