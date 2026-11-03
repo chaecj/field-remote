@@ -84,6 +84,11 @@ final class ScreenShare implements DisplayManager.DisplayListener {
 
     private String error = "";
 
+    // 확대·위치 (사진·영상·PDF). z = 배율(1 = 원래), x·y = 가운데에서 옮긴 거리 (TV 가로·세로 대비 비율)
+    private float vz = 1f, vx = 0f, vy = 0f;
+    private int pdfQ = 1;                       // PDF를 몇 배 해상도로 그렸는지 (확대하면 더 선명하게 다시 그림)
+    private final Runnable pdfSharpen = this::render;
+
     // PPT: TV 화면의 WebView에서 pptx를 그림 (assets/pptx-render.js)
     private String pptJs;                 // 그리기 라이브러리 (처음 한 번 읽음)
     private volatile Uri webFile;         // https://pptx.local/file 로 넘겨줄 파일
@@ -244,6 +249,7 @@ final class ScreenShare implements DisplayManager.DisplayListener {
             uri = Uri.parse(j.getString("uri"));
             type = j.optString("type", "image");
             page = Math.max(0, j.optInt("page", 0));
+            setViewValues((float) j.optDouble("z", 1), (float) j.optDouble("x", 0), (float) j.optDouble("y", 0));
         } catch (Exception e) { return; }
         black = false;
         error = "";
@@ -279,6 +285,37 @@ final class ScreenShare implements DisplayManager.DisplayListener {
         emit();
     }
 
+    /** 확대·위치 바꾸기 (손가락으로 움직이는 동안 계속 불림) */
+    void setView(float z, float x, float y) {
+        setViewValues(z, x, y);
+        applyView();
+        // PDF는 많이 확대하면 더 높은 해상도로 다시 그림 (손을 뗀 뒤 잠깐 있다가)
+        if ("pdf".equals(type) && pdfQuality() > pdfQ) { Hub.main.removeCallbacks(pdfSharpen); Hub.main.postDelayed(pdfSharpen, 350); }
+    }
+
+    private void setViewValues(float z, float x, float y) {
+        if (Float.isNaN(z) || Float.isNaN(x) || Float.isNaN(y)) return;
+        vz = Math.max(1f, Math.min(8f, z));
+        float lim = vz / 2f + 0.5f;   // 화면 밖으로 완전히 사라지지 않을 만큼만
+        vx = Math.max(-lim, Math.min(lim, x));
+        vy = Math.max(-lim, Math.min(lim, y));
+    }
+
+    private int pdfQuality() { return vz <= 1.2f ? 1 : vz <= 2.2f ? 2 : 3; }
+
+    // TV 화면의 사진·영상 뷰 자체를 키우고 옮김 (GPU로 처리돼 부드러움)
+    private void applyView() {
+        if (screen == null || screen.root == null) return;
+        boolean on = "image".equals(type) || "video".equals(type) || "pdf".equals(type);
+        float z = on ? vz : 1f;
+        float w = screen.root.getWidth() > 0 ? screen.root.getWidth() : dispW;
+        float h = screen.root.getHeight() > 0 ? screen.root.getHeight() : dispH;
+        for (View v : new View[]{screen.img, screen.tex}) {
+            v.setScaleX(z); v.setScaleY(z);
+            v.setTranslationX(on ? vx * w : 0); v.setTranslationY(on ? vy * h : 0);
+        }
+    }
+
     void clear() { uri = null; type = ""; black = true; releaseVideo(); render(); emit(); }
 
     // ---------- 그리기 ----------
@@ -287,10 +324,12 @@ final class ScreenShare implements DisplayManager.DisplayListener {
     private void render() {
         final int my = ++seq;
         applyCover();
+        applyView();
         if (screen == null || uri == null) { releaseVideo(); if (screen != null) { screen.img.setVisibility(View.GONE); screen.tex.setVisibility(View.GONE); hideWeb(); } return; }
         final Uri u = uri;
         final int W = dispW, H = dispH, pg = page;
         final boolean fl = fill;
+        final int q = pdfQ = pdfQuality();
         if (!"html".equals(type) && !"ppt".equals(type)) hideWeb();
         if ("video".equals(type)) { startVideo(u, my); return; }
         releaseVideo();
@@ -313,7 +352,7 @@ final class ScreenShare implements DisplayManager.DisplayListener {
                     String html = withViewport(readText(u), W);
                     Hub.main.post(() -> { if (my == seq && screen != null) showHtml(html); });
                 } else if ("pdf".equals(t)) {
-                    Bitmap bm = renderPdf(u, pg, W, H, fl);
+                    Bitmap bm = renderPdf(u, pg, W, H, fl, q);
                     Hub.main.post(() -> { if (my == seq && screen != null) showImage(bm, null); });
                 } else {
                     Drawable dr = decodeImage(u, W, H);
@@ -424,23 +463,27 @@ final class ScreenShare implements DisplayManager.DisplayListener {
 
     private Drawable decodeImage(Uri u, int W, int H) throws Exception {
         ImageDecoder.Source src = ImageDecoder.createSource(act.getContentResolver(), u);
-        // TV 해상도보다 너무 큰 사진은 줄여서 읽음 (메모리 아끼기). 화면에 맞추는 건 ImageView가 TV 해상도로 함
+        // 확대해도 선명하게 원본 해상도로 읽되, 긴 쪽이 4096픽셀을 넘는 아주 큰 사진만 줄여서 읽음 (메모리 아끼기)
+        // 화면에 맞추는 건 ImageView가 TV 해상도로 함
         return ImageDecoder.decodeDrawable(src, (dec, info, s) -> {
             Size sz = info.getSize();
             int sample = 1;
-            while (sz.getWidth() / (sample * 2) >= W && sz.getHeight() / (sample * 2) >= H) sample *= 2;
+            while (Math.max(sz.getWidth(), sz.getHeight()) / sample > 4096) sample *= 2;
             dec.setTargetSampleSize(sample);
         });
     }
 
     // PDF 한 장을 TV 해상도에 딱 맞는 크기로 그림
-    private Bitmap renderPdf(Uri u, int pg, int W, int H, boolean fl) throws Exception {
+    private Bitmap renderPdf(Uri u, int pg, int W, int H, boolean fl, int q) throws Exception {
         openPdf(u);
         int n = pdf.getPageCount();
         PdfRenderer.Page p = pdf.openPage(Math.min(pg, n - 1));
         try {
             float pw = p.getWidth(), ph = p.getHeight();
-            float s = fl ? Math.max(W / pw, H / ph) : Math.min(W / pw, H / ph);
+            float s = (fl ? Math.max(W / pw, H / ph) : Math.min(W / pw, H / ph)) * q;
+            // 너무 큰 그림은 메모리가 모자라니 2400만 화소까지만
+            float px = pw * s * ph * s;
+            if (px > 24_000_000f) s *= (float) Math.sqrt(24_000_000f / px);
             int bw = Math.max(1, Math.min(8192, Math.round(pw * s)));
             int bh = Math.max(1, Math.min(8192, Math.round(ph * s)));
             Bitmap bm = Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888);

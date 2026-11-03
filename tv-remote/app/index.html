@@ -245,6 +245,12 @@ nav.tabs .in { max-width: 480px; margin: 0 auto; display: grid; grid-template-co
 .shitem .del { position: absolute; right: 4px; top: 4px; width: 24px; height: 24px; border-radius: 50%; background: var(--rec); color: #fff; display: grid; place-items: center; font-size: 16px; line-height: 1; }
 .shitem .nm { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .shitem .bd { font-size: 11px; color: var(--muted); }
+.zoompad { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 10px; overflow: hidden; touch-action: none; border: 1px solid var(--line); cursor: grab; user-select: none; -webkit-user-select: none;
+  background-image: linear-gradient(rgb(255 255 255 / 0.06) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / 0.06) 1px, transparent 1px); background-size: 25% 33.33%; }
+.zoompad img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transform-origin: 50% 50%; pointer-events: none; }
+.zoompad .zh { position: absolute; left: 8px; bottom: 6px; font-size: 11px; color: rgb(255 255 255 / 0.75); text-shadow: 0 1px 2px #000; pointer-events: none; }
+.zoombtns { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.zoombtns .key { min-height: 44px; font-size: 13px; }
 select.slim { padding: 9px 12px; font-size: 14px; color: var(--muted); }
 .clicker { display: grid; grid-template-columns: 2fr 3fr; gap: 10px; height: calc(100vh - 420px); min-height: 240px; max-height: 520px; }
 .cbig { font-size: 16px; border-radius: 24px; align-content: center; gap: 6px; }
@@ -308,8 +314,8 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
   .clk-view > .clicker { grid-row: 1 / span 5; height: calc(100vh - 220px); max-height: none; min-height: 200px; }
 
   /* 화면 공유: 왼쪽 = 연결·조작, 오른쪽 = 파일 목록 */
-  .share-view > #shareStat, .share-view > .sharenow, .share-view > .sharectl, .share-view > .vidctl, .share-view > .shopts { grid-column: 1; }
-  .share-view > .shlist { grid-row: 1 / span 6; }
+  .share-view > #shareStat, .share-view > .sharenow, .share-view > .sharectl, .share-view > .vidctl, .share-view > #zoomCard, .share-view > .shopts { grid-column: 1; }
+  .share-view > .shlist { grid-row: 1 / span 7; }
 
   /* TV 설정: 카드 2열 */
   #v-set { grid-template-columns: 1fr; }
@@ -454,6 +460,11 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
       <button class="key" id="shPlay">일시정지</button>
       <button class="key" id="shLoop" aria-pressed="true">반복</button>
       <button class="key" id="shMute" aria-pressed="false">소리 끄기</button>
+    </div>
+    <div class="card" id="zoomCard" hidden>
+      <div class="row"><h2 class="grow">확대·위치</h2><span class="pill" id="zoomVal">1.0×</span></div>
+      <div class="zoompad" id="zoomPad"><img id="zoomImg" alt=""><span class="zh">두 손가락 = 확대·축소 · 끌기 = 위치 · 두 번 톡 = 원래대로</span></div>
+      <div class="zoombtns"><button class="key" id="zOut">− 축소</button><button class="key" id="zReset">원래대로</button><button class="key" id="zIn">+ 확대</button></div>
     </div>
     <div class="shopts grid" style="gap:8px">
       <span class="label">TV 화면에 맞추기</span>
@@ -1650,7 +1661,8 @@ var share = {
     const s = this.s, it = s.items[i]; if (!it) return;
     if (!this.st.disp) { ui.toast('먼저 TV 화면을 연결해 주세요.'); return; }
     s.cur = i; s.page = clamp(page, 0, Math.max(0, (it.pages || 1) - 1)); save();
-    try { Native.shareShow(JSON.stringify({ uri: it.uri, type: it.type, page: s.page })); } catch (e) {}
+    const v = this.view(it);
+    try { Native.shareShow(JSON.stringify({ uri: it.uri, type: it.type, page: s.page, z: v.z, x: v.x, y: v.y })); } catch (e) {}
     this.render();
   },
   // 다음/이전: PDF는 한 장씩, 끝나면 다음 파일
@@ -1695,6 +1707,38 @@ var share = {
         <li><b>구글 슬라이드:</b> 더보기 → 공유 및 내보내기 → 다른 이름으로 저장 → .pptx 또는 PDF</li>
       </ul>
       <button class="btn" data-x>닫기</button>`, (s, close) => { $('[data-x]', s).onclick = close; });
+  },
+  // ---- 확대·위치: 파일마다 기억 ----
+  zoomable(it) { return !!it && ['image', 'video', 'pdf'].includes(it.type); },
+  view(it) { return { z: it && it.z || 1, x: it && it.x || 0, y: it && it.y || 0 }; },
+  setView(z, x, y, done) {
+    const it = this.item(); if (!this.zoomable(it)) return;
+    z = clamp(z, 1, 8);
+    const lim = z / 2 + 0.5;               // 화면 밖으로 완전히 사라지지 않을 만큼만 (TV 쪽과 같음)
+    if (z <= 1.001) { x = 0; y = 0; }        // 원래 크기로 돌아오면 가운데로
+    it.z = z; it.x = clamp(x, -lim, lim); it.y = clamp(y, -lim, lim);
+    this.renderZoom();
+    // 손가락이 움직이는 동안은 화면 그릴 때마다 한 번만 보냄
+    if (!this._raf) this._raf = requestAnimationFrame(() => {
+      this._raf = 0; const c = this.item(); if (!c) return;
+      try { Native.shareView(c.z || 1, c.x || 0, c.y || 0); } catch (e) {}
+    });
+    if (done) save();
+  },
+  renderZoom() {
+    const card = $('#zoomCard'); if (!card) return;
+    const s = this.s, st = this.st, it = this.item();
+    card.hidden = !(NATIVE && st.disp && this.zoomable(it));
+    if (card.hidden) return;
+    const v = this.view(it), pad = $('#zoomPad'), img = $('#zoomImg');
+    pad.style.aspectRatio = `${st.disp.w} / ${st.disp.h}`;
+    // PDF는 첫 장 미리보기만 있어서 다른 장에서는 그림 없이 칸만 보여 줌
+    const src = it.type === 'pdf' && s.page > 0 ? '' : (it.thumb || '');
+    if (img.getAttribute('src') !== src) { if (src) img.setAttribute('src', src); else img.removeAttribute('src'); }
+    img.hidden = !src;
+    img.style.objectFit = s.fill ? 'cover' : 'contain';
+    img.style.transform = `translate(${v.x * 100}%, ${v.y * 100}%) scale(${v.z})`;
+    $('#zoomVal').textContent = v.z.toFixed(1) + '×';
   },
   fmt(ms) { const t = Math.round(ms / 1000); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; },
   badge(it) {
@@ -1749,6 +1793,7 @@ var share = {
     $('#shMute').setAttribute('aria-pressed', !!s.mute);
     $('#shMute').textContent = s.mute ? '소리 켜기' : '소리 끄기';
     $$('#shFit button').forEach(b => b.setAttribute('aria-pressed', (b.dataset.fit === '1') === !!s.fill));
+    this.renderZoom();
     $('#shEdit').textContent = this.edit ? '완료' : '편집';
     $('#shEdit').hidden = !s.items.length;
     // 파일 목록
@@ -1760,6 +1805,42 @@ var share = {
     $$('#shareList .shitem').forEach(b => b.onclick = () => { const i = +b.dataset.i; this.edit ? this.remove(i) : this.show(i); });
   },
 };
+// 확대·위치 조절판: 한 손가락 = 옮기기, 두 손가락 = 벌린 곳을 중심으로 확대·축소, 두 번 톡 = 원래대로
+function bindZoom() {
+  const pad = $('#zoomPad'), pts = new Map();
+  let base = null, lastTap = 0;
+  const cur = () => share.view(share.item());
+  const snap = () => { base = { v: cur(), pts: [...pts.values()].map(p => ({ ...p })) }; };
+  const rect = () => pad.getBoundingClientRect();
+  pad.addEventListener('pointerdown', (e) => {
+    if (!share.zoomable(share.item())) return;
+    try { pad.setPointerCapture(e.pointerId); } catch (_) {} pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); snap();
+    const now = Date.now();
+    if (pts.size === 1 && now - lastTap < 300) { share.setView(1, 0, 0, true); lastTap = 0; } else lastTap = now;
+  });
+  pad.addEventListener('pointermove', (e) => {
+    if (!pts.has(e.pointerId) || !base) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const r = rect(), W = r.width, H = r.height, now = [...pts.values()], b = base.pts, v = base.v;
+    if (now.length === 1 && b.length === 1) {
+      share.setView(v.z, v.x + (now[0].x - b[0].x) / W, v.y + (now[0].y - b[0].y) / H);
+    } else if (now.length >= 2 && b.length >= 2) {
+      const d = (a, c) => Math.hypot(a.x - c.x, a.y - c.y) || 1;
+      const mid = (a, c) => ({ x: ((a.x + c.x) / 2 - r.left) / W - 0.5, y: ((a.y + c.y) / 2 - r.top) / H - 0.5 });
+      const z = clamp(v.z * d(now[0], now[1]) / d(b[0], b[1]), 1, 8), k = z / v.z;
+      const m0 = mid(b[0], b[1]), m1 = mid(now[0], now[1]);
+      // 손가락 사이 지점이 그대로 손가락 밑에 있도록
+      share.setView(z, m1.x - (m0.x - v.x) * k, m1.y - (m0.y - v.y) * k);
+    }
+  });
+  const up = (e) => { if (!pts.delete(e.pointerId)) return; snap(); if (!pts.size) save(); };
+  pad.addEventListener('pointerup', up); pad.addEventListener('pointercancel', up);
+  pad.addEventListener('wheel', (e) => { e.preventDefault(); const v = cur(); share.setView(v.z * (e.deltaY < 0 ? 1.1 : 1 / 1.1), v.x, v.y, true); }, { passive: false });
+  const stepZoom = (k) => { const v = cur(); const z = clamp(v.z * k, 1, 8), r = z / v.z; share.setView(z, v.x * r, v.y * r, true); };
+  $('#zIn').onclick = () => stepZoom(1.25);
+  $('#zOut').onclick = () => stepZoom(1 / 1.25);
+  $('#zReset').onclick = () => share.setView(1, 0, 0, true);
+}
 function bindShare() {
   const s = share.s;
   $('#shAdd').onclick = () => { if (!NATIVE) { ui.toast('안드로이드 앱에서만 쓸 수 있어요.'); return; } Native.sharePick(); };
@@ -1776,6 +1857,7 @@ function bindShare() {
   $('#shLoop').onclick = () => { s.loop = !s.loop; save(); try { Native.shareLoop(s.loop); } catch (e) {} share.render(); };
   $('#shMute').onclick = () => { s.mute = !s.mute; save(); try { Native.shareMute(s.mute); } catch (e) {} share.render(); };
   $$('#shFit button').forEach(b => b.onclick = () => { s.fill = b.dataset.fit === '1'; save(); try { Native.shareFill(s.fill); } catch (e) {} share.render(); });
+  bindZoom();
   if (NATIVE) {
     // 앱을 켤 때 TV는 검은 화면에서 시작 (지난번 파일을 저절로 띄우지 않음)
     s.cur = -1;
