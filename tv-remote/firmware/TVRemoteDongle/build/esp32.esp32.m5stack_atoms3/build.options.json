@@ -1,9 +1,0 @@
-{
-  "additionalFiles": "",
-  "compiler.optimization_flags": "-Os",
-  "customBuildProperties": "runtime.tools.ctags.path=/root/fake/noctags",
-  "fqbn": "esp32:esp32:m5stack_atoms3:USBMode=default,CDCOnBoot=default",
-  "hardwareFolders": "/root/.arduino15/packages",
-  "otherLibrariesFolders": "/root/Arduino/libraries",
-  "sketchLocation": "/home/user/field-remote/tv-remote/firmware/TVRemoteDongle"
-}
