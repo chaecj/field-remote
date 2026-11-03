@@ -43,6 +43,7 @@
 
 extern "C" bool tud_mounted(void);
 extern "C" bool tud_suspended(void);
+extern "C" bool tud_remote_wakeup(void);
 extern "C" int ble_store_clear(void);
 #include "esp_system.h"
 
@@ -62,7 +63,7 @@ static const int PIN_IR  = 4;   // 내장 IR LED
 static const int PIN_LED = 35;  // RGB LED (WS2812)
 static const int PIN_BTN = 41;  // 윗면 버튼
 
-static const char *FW_VERSION = "1.3.0";
+static const char *FW_VERSION = "1.4.0";
 
 // ---------------- BLE UUID ----------------
 #define SVC_UUID  "7e1a0001-5c2b-4f3a-9e7d-3c1b8a9f0a11"
@@ -148,12 +149,31 @@ void ledBase() { led(baseR, baseG, baseB); }
 void ledFlash() { led(30, 30, 30); delay(25); ledBase(); }
 
 // ---------------- 정보 ----------------
-bool usbReady() { return tud_mounted() && !tud_suspended(); }
+// USB 상태. TV가 쉬는 동안 USB를 절전시켜도 '연결됨'으로 봄 (누르면 깨움)
+// 잠깐 끊겼다 붙는 건 3초 동안 기다렸다가 알림 (표시가 깜빡이지 않게)
+bool usbOn = false, usbSleep = false;
+void usbPoll() {
+  static uint32_t offSince = 0;
+  if (tud_mounted()) { usbOn = true; offSince = 0; }
+  else if (usbOn) {
+    if (!offSince) offSince = millis() | 1;
+    else if (millis() - offSince > 3000) usbOn = false;
+  }
+  usbSleep = tud_mounted() && tud_suspended();
+}
+// 절전 중이면 TV를 먼저 깨운 뒤 보냄 (안 깨우면 누른 키가 버려짐)
+void usbWake() {
+  if (!tud_mounted() || !tud_suspended()) return;
+  if (!tud_remote_wakeup()) return;          // TV가 깨우기를 허락하지 않은 경우
+  uint32_t t0 = millis();
+  while (tud_suspended() && millis() - t0 < 300) delay(5);
+  delay(20);
+}
 
 void publishInfo() {
   if (!infoChar) return;
   String j = "{\"n\":\"" + devName + "\",\"v\":\"" + FW_VERSION + "\",\"usb\":" +
-             (usbReady() ? "true" : "false") + ",\"bt\":" + String(btHostCount()) +
+             (usbOn ? "true" : "false") + ",\"us\":" + String(usbSleep ? 1 : 0) + ",\"bt\":" + String(btHostCount()) +
              ",\"mtu\":" + String(peerMtu) + ",\"btn\":" + String(btnCount) +
              ",\"uc\":" + String(usbCompat ? 1 : 0) + ",\"o\":\"" + otaMsg + "\",\"d\":\"" + diag + "\"}";
   infoChar->setValue(j.c_str());
@@ -375,6 +395,12 @@ void handle(const Msg &m) {
   size_t pn = n - 1;
 
   switch (c) {
+    case C_KEY_TAP: case C_KEY_DOWN: case C_TEXT: case C_MOUSE_MOVE: case C_MOUSE_CLICK:
+    case C_MOUSE_DOWN: case C_CC_TAP: case C_CC_DOWN: case C_SYSTEM:
+      usbWake(); break;
+  }
+
+  switch (c) {
     case C_KEY_TAP: if (pn >= 1) keyTap(p[0], pn >= 2 ? p[1] : 0); break;
     case C_KEY_DOWN: if (pn >= 1) kPress(p[0]); break;
     case C_KEY_UP: if (pn >= 1) kRelease(p[0]); break;
@@ -529,6 +555,8 @@ void setup() {
   sysctl = new USBHIDSystemControl();
   USB.productName("HW Remote");
   USB.manufacturerName("CHAEUM");
+  USB.usbAttributes(TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP);   // 버스 전원 + 절전 중 깨우기 지원 (기본값은 '자체 전원'이라 틀림)
+  USB.usbPower(100);                                         // 일반 키보드와 같은 100mA 요청 (500mA 요청은 일부 TV가 거부)
   kbd->begin();
   mouse->begin();
   consumer->begin();
@@ -626,7 +654,10 @@ void loop() {
     stage(phoneConnected() ? 8 : 7);
     static bool diagCleared = false;   // 2분 동안 문제없이 돌면 저장된 진단 기록은 지움 (이번 실행 동안은 계속 보여 줌)
     if (!diagCleared && now > 120000) { diagCleared = true; prefs.remove("diag"); }
-    bool usb = usbReady();
+    usbPoll();
+    bool usb = usbOn;
+    static bool lastSleep = false;
+    if (usbSleep != lastSleep) { lastSleep = usbSleep; infoDirty = true; }
     int hosts = btHostCount();
     if (usb != lastUsb) { lastUsb = usb; infoDirty = true; }
     if (hosts != lastHosts) { lastHosts = hosts; infoDirty = true; }
