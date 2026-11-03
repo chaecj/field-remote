@@ -14,7 +14,7 @@
 | 경로 | 내용 |
 |---|---|
 | `tv-remote/app/index.html` | **화면 전체 (HTML/CSS/JS 한 파일)**. 대부분의 수정은 여기서 한다 |
-| `tv-remote/android/` | 안드로이드 앱 껍데기: WebView + 블루투스(BleManager), 휴대폰 키보드(HidKeyboard), 볼륨키 클리커·연결 유지(RemoteService), 앱 안 업데이트(Updater), JS 브리지(Bridge → `window.Native`) |
+| `tv-remote/android/` | 안드로이드 앱 껍데기: WebView + 블루투스(BleManager), 휴대폰 키보드(HidKeyboard), 볼륨키 클리커·연결 유지(RemoteService), 앱 안 업데이트(Updater), 화면 공유(ScreenShare: 미러링·HDMI로 연결된 TV에 Presentation으로 파일만 표시), JS 브리지(Bridge → `window.Native`) |
 | `tv-remote/android/app/src/main/assets/index.html` | 빌드 때 `app/index.html`이 자동 복사됨. 직접 고치지 않는다 |
 | `tv-remote/firmware/TVRemoteDongle/TVRemoteDongle.ino` | 동글 펌웨어 (Arduino, ESP32 core 3.3.x) |
 | `tv-remote/firmware/TVRemoteDongle.merged.bin` | PC로 처음 굽는 통합 이미지 (주소 **0x0**) |
@@ -44,4 +44,5 @@
 - 테마: 어두운 네이비 배경 + HW 로고의 파란 그라데이션. 색은 `:root` 토큰만 쓴다.
 - 세로·가로(태블릿) 모두 지원. 가로는 `@media (orientation: landscape) and (min-width: 700px)`에서 2단 배치.
 - 고친 뒤에는 최소한 JS 문법 검사(`node --check`)와, 펌웨어면 컴파일까지 확인한다.
+- 안드로이드 Java를 고치면 `javac`로 컴파일 검사한다. 클라우드 세션엔 Android SDK가 없으므로 Maven Central의 `org.robolectric:android-all`(API 34) jar를 클래스패스로 쓴다 (minSdk 28 이하 API인지는 직접 확인).
 - 사용자에게는 바뀐 파일과 그대로인 파일을 분명히 알려 준다.
