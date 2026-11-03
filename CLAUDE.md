@@ -26,6 +26,8 @@
 - **펌웨어**: `.ino` 수정 → 컴파일 → `TVRemoteDongle.app.bin`과 `latest.json`(version, size, sha256, url) 갱신 → push. `FW_VERSION`을 올려야 앱이 새 버전으로 인식한다. 앱의 TV 설정 탭에서 무선 업데이트.
   - 컴파일: `arduino-cli compile --fqbn "esp32:esp32:m5stack_atoms3:USBMode=default,CDCOnBoot=default" --export-binaries`
   - USB Mode는 반드시 **USB-OTG (TinyUSB)** (`USBMode=default`).
+  - 클라우드 세션에서는 downloads.arduino.cc가 막혀 있다. 코어 색인은 `raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json`, 빠진 `arduino:dfu-util`은 빈 대체 패키지로 채우고, ctags는 빈 스크립트로 바꿔(`--build-property runtime.tools.ctags.path=…`) 컴파일한다. 스케치는 함수 선언 순서가 맞아 자동 선언 없이도 컴파일된다.
+  - 통합 이미지(`merged.bin`)는 뒤쪽 0xFF를 잘라 4KB 단위로 맞춘다.
 - **main에 합치기 (사용자와 정한 규칙)**
   - 앱·문서 변경: 확인(`node --check`, 가능하면 데모 TV로 동작 확인)을 마치면 **묻지 않고** PR을 만들어 바로 main에 합친다. 합친 뒤 APK 빌드가 시작됐는지 확인하고 알려 준다.
   - **펌웨어 변경(`tv-remote/firmware/**`)은 예외**: 컴파일까지 마친 뒤 사용자에게 먼저 묻고 합친다. 동글 업데이트가 잘못되면 PC로 다시 구워야 해서다.

@@ -711,7 +711,7 @@ class Dongle {
   }
   onInfo(dv) {
     let j; try { j = JSON.parse(typeof dv === 'string' ? dv : dec.decode(dv)); } catch (e) { return; }
-    this.devName = j.n || this.devName; this.fw = j.v || ''; this.usb = !!j.usb; this.bt = j.bt || 0; this.diag = j.d || ''; this.uc = j.uc; this.otaMsg = j.o || '';
+    this.devName = j.n || this.devName; this.fw = j.v || ''; this.usb = !!j.usb; this.usbSleep = !!j.us; this.bt = j.bt || 0; this.diag = j.d || ''; this.uc = j.uc; this.otaMsg = j.o || '';
     this.mtu = Math.max(23, Math.min(517, j.mtu || 23));
     if (this.btn !== null && j.btn !== this.btn) ui.identifyFromButton(this);
     this.btn = j.btn;
@@ -1051,7 +1051,7 @@ const ui = {
           ${d.demo ? '' : `<button class="btn sm" id="identBtn">동글 LED 깜빡이기</button>`}</div>
         <dl class="kv">
           <dt>연결</dt><dd>${d.state === 'on' ? '연결됨' : d.state === 'wait' ? '연결 중' : '끊김'}</dd>
-          <dt>USB</dt><dd>${d.usb ? '키보드·마우스로 인식됨' : '인식 안 됨 (꽂은 기기 전원·포트 확인)'}</dd>
+          <dt>USB</dt><dd>${d.usb ? (d.usbSleep ? '인식됨 · TV가 USB 절전 중 (누르면 깨워서 보냄)' : '키보드·마우스로 인식됨') : '인식 안 됨 (꽂은 기기 전원·포트 확인)'}</dd>
           <dt>블루투스 키보드</dt><dd>${d.bt ? d.bt + '대 연결됨' : '연결 안 됨'}</dd>
           <dt>동글</dt><dd>${esc(d.devName)} · MTU ${d.mtu}</dd>
           ${d.demo ? '' : `<dt>펌웨어</dt><dd id="fwRow">${fw.rowHtml(d)}</dd>`}
