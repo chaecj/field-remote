@@ -711,7 +711,7 @@ class Dongle {
       setTimeout(() => { if (this.state === 'offline') this.connect().catch(() => {}); }, wait);
     }
   }
-  get payloadMax() { return this.mtu - 3; }
+  get payloadMax() { return Math.min(BLE_MAX_WRITE, this.mtu - 3); }
   write(bytes, reliable = false) {
     if (this.state !== 'on') return Promise.reject(new Error('offline'));
     this.pending++;
@@ -746,7 +746,7 @@ class NativeDongle {
     this.acc = { x: 0, y: 0, w: 0 }; this.moveTimer = null;
   }
   get pending() { try { return Native.pending(this.id); } catch (e) { return 0; } }
-  get payloadMax() { return this.mtu - 3; }
+  get payloadMax() { return Math.min(BLE_MAX_WRITE, this.mtu - 3); }
   connect() { this.state = 'wait'; ui.render(); Native.connect(this.id); return Promise.resolve(); }
   write(bytes, reliable = false) {
     if (this.state !== 'on') return Promise.reject(new Error('offline'));
@@ -789,7 +789,7 @@ class DemoDongle {
     this.id = 'demo-' + n; this.devName = '데모 TV ' + n; this.state = 'on'; this.usb = true; this.fw = 'demo';
     this.mtu = 247; this.pending = 0; this.toggle = 0; this.demo = true; this.bt = 0;
   }
-  get payloadMax() { return this.mtu - 3; }
+  get payloadMax() { return Math.min(BLE_MAX_WRITE, this.mtu - 3); }
   async connect() { this.state = 'on'; ui.render(); }
   write(bytes) { return new Promise(r => setTimeout(r, 12)); }
   queueMove() {}
@@ -801,6 +801,9 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const linkLabel = (d) => d.usb && d.bt ? 'USB·BT' : d.usb ? 'USB' : d.bt ? 'BT' : '기기 대기';
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
+// 동글(ESP32 블루투스)은 한 번에 512바이트까지만 받음. 그보다 크면 통째로 거절해서
+// 예전엔 MTU 517일 때 514바이트 조각을 보내 펌웨어 무선 업데이트가 늘 실패했음
+const BLE_MAX_WRITE = 512;
 /* ---------------- 명령 실행 ---------------- */
 const dongles = new Map();     // id → Dongle
 let current = null;            // 설정·매크로 기준 TV
