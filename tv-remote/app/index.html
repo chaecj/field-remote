@@ -168,10 +168,15 @@ details.more .grid { margin-top: 12px; }
 .caminner video, .caminner canvas, .caminner svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .caminner video[hidden], .caminner canvas[hidden] { display: none; }
 #camOverlay .q { fill: color-mix(in srgb, var(--accent) 14%, transparent); stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; }
-#camOverlay .h { fill: color-mix(in srgb, var(--accent) 45%, transparent); stroke: var(--fg); stroke-width: 2; vector-effect: non-scaling-stroke; cursor: grab; }
+#camOverlay .h { fill: color-mix(in srgb, var(--accent) 45%, transparent); stroke: var(--fg); stroke-width: 2; vector-effect: non-scaling-stroke; }
+#camOverlay .h.next { fill: color-mix(in srgb, var(--warn) 70%, transparent); stroke-width: 3; }
 #camOverlay .rp { fill: none; stroke: var(--ok); stroke-width: 3; vector-effect: non-scaling-stroke; pointer-events: none; animation: camrp 0.7s ease-out forwards; }
 @keyframes camrp { from { opacity: 1; } to { opacity: 0; } }
-.cammsg { margin: 0; font-size: 13.5px; color: var(--fg); }
+.cammsg { margin: 0; font-size: 14px; color: var(--fg); font-weight: 600; }
+.camsteps { margin: 0; padding-left: 20px; display: grid; gap: 3px; font-size: 12.5px; color: var(--muted); }
+.camsteps b { color: var(--fg); font-weight: 600; }
+.camsteps li.on { color: var(--fg); }
+.camsteps li.on::marker { color: var(--accent); font-weight: 700; }
 .cammsg small { display: block; color: var(--muted); font-size: 12px; }
 .cambtns { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; }
 .cambtns .key[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent); color: var(--fg); }
@@ -484,7 +489,11 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
         <button class="key" id="camEdit" aria-pressed="false">모서리</button>
         <button class="key" id="camZoom">확대 1×</button>
       </div>
-      <p class="hint">톡 = 클릭 · 길게 = 오른쪽 클릭 · 검색창을 누른 뒤 위 입력칸에 치면 돼요</p>
+      <ol class="camsteps" id="camSteps">
+        <li data-s="0"><b>찍기</b>: TV가 크게 보이게 비추고 누르기</li>
+        <li data-s="1"><b>확인</b>: 파란 테두리가 TV 화면에 맞는지 보기 (안 맞으면 <b>모서리</b>)</li>
+        <li data-s="2"><b>누르기</b>: 사진 속 TV를 누르면 TV에서 클릭 · 길게 = 오른쪽 클릭 · 글자는 위 입력칸</li>
+      </ol>
       <div class="volrow"><span class="grow">누른 뒤 자동으로 다시 찍기<small>결과를 바로 확인 (휴대폰을 크게 움직이지 마세요)</small></span><button class="toggle" id="camAuto" aria-pressed="true">켬</button></div>
       <div class="volrow"><span class="grow">TV가 누른 곳으로 안 가면<small>커서를 옮겨서 클릭 (대략 맞춤, 일부 스마트 TV용)</small></span><button class="toggle" id="camRel" aria-pressed="false">끔</button></div>
       <p class="hint" id="camFwNote" hidden>동글 펌웨어를 1.6.0 이상으로 올리면 누른 곳을 정확히 클릭해요. 지금은 커서를 옮겨서 대략 맞춰요.</p>
@@ -1989,7 +1998,9 @@ var cam = {
   stream: null, frame: null,          // frame = 마지막으로 찍은 사진 (canvas)
   quad: null,                         // 사진 속 TV 네 모서리 [[x,y]*4] 왼위·오위·오아래·왼아래 (사진 픽셀)
   H: null,                            // 사진 좌표 → TV 화면(0~1) 변환
-  zoom: 1, busy: false, refreshT: 0, edit: false,   // edit = 모서리 맞추는 중
+  zoom: 1, busy: false, refreshT: 0, edit: false, step: 0,   // edit = 모서리 맞추는 중 (step = 다음에 누를 귀퉁이)
+  // 안내 단계 표시 (0 찍기, 1 확인·모서리, 2 누르기)
+  stage(i) { $$('#camSteps li').forEach(li => li.classList.toggle('on', +li.dataset.s === i)); },
   get s() { const o = store.cam || (store.cam = {}); if (!('auto' in o)) o.auto = true; return o; },
 
   async start() {
@@ -2005,7 +2016,7 @@ var cam = {
     try { await v.play(); } catch (e) {}
     this.fit(v.videoWidth, v.videoHeight);
     this.live(true);
-    this.msg('TV가 화면에 들어오게 비추고 <b>찍기</b>를 누르세요.');
+    this.msg('TV가 크게 보이게 비추고 <b>찍기</b>를 누르세요.'); this.stage(0);
     return true;
   },
   stop() {
@@ -2028,7 +2039,7 @@ var cam = {
     c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
     this.frame = c;
     const found = this.detect(c);
-    if (found) { this.quad = found; this.setEdit(false); this.msg('TV를 찾았어요. 사진 속 TV 화면을 누르면 TV에서 클릭해요. <small>테두리가 어긋나면 ‘모서리’를 눌러 맞추세요</small>'); }
+    if (found) { this.quad = found; this.setEdit(false); this.msg('TV를 찾았어요. 파란 테두리가 맞으면 사진 속 TV를 눌러 조작하세요.'); this.stage(2); }
     else if (keepQuad && this.quad) { /* 손을 거의 안 움직였다고 보고 이전 모서리 그대로 */ }
     else {
       const w = c.width, h = c.height;
@@ -2039,55 +2050,66 @@ var cam = {
     return true;
   },
 
-  // TV 화면 자동 찾기
-  // 1) TV의 검은 테두리 안쪽 = 화면 (화면 내용이 어둡거나 벽과 색이 비슷해도 잘 찾음)
-  // 2) 테두리가 안 보이면 밝은 큰 네모(켜진 화면)
-  // 둘 다 실패하면 null → 사용자가 모서리를 끌어 맞춤
+  // TV 화면 자동 찾기: 후보를 여러 가지로 모아 'TV다운' 정도(네모에 꽉 참·16:9에 가까움·크기)로 점수를 매겨 고름
+  //  A) 검은 테두리 안쪽 (화면이 밝을 때 가장 정확)
+  //  B) 테두리까지 포함한 TV 전체 (화면 내용이 어두워 테두리와 붙을 때)
+  //  C) 밝은 네모 (어두운 방에서 켜진 화면)
+  // 모두 마땅치 않으면 null → 사용자가 귀퉁이 네 곳을 눌러 맞춤
   detect(c) {
     const W = 240, Hh = Math.max(1, Math.round(c.height * W / c.width)), n = W * Hh;
     const t = document.createElement('canvas'); t.width = W; t.height = Hh;
     const g = t.getContext('2d', { willReadFrequently: true }); g.drawImage(c, 0, 0, W, Hh);
     const px = g.getImageData(0, 0, W, Hh).data, lum = new Uint8Array(n), hist = new Array(256).fill(0);
-    for (let i = 0; i < n; i++) { const L = (px[i * 4] * 77 + px[i * 4 + 1] * 150 + px[i * 4 + 2] * 29) >> 8; lum[i] = L; hist[L]++; }
+    let mean = 0;
+    for (let i = 0; i < n; i++) { const L = (px[i * 4] * 77 + px[i * 4 + 1] * 150 + px[i * 4 + 2] * 29) >> 8; lum[i] = L; hist[L]++; mean += L; }
+    mean /= n;
     const nbrs = (k) => { const x = k % W, y = (k / W) | 0; return [x > 0 ? k - 1 : -1, x < W - 1 ? k + 1 : -1, y > 0 ? k - W : -1, y < Hh - 1 ? k + W : -1]; };
-    // 조건(ok)을 만족하는 칸들 중 가장 큰 덩어리
-    const biggest = (ok) => {
-      const seen = new Uint8Array(n), st = []; let best = null;
+    // 조건(ok)을 만족하는 칸들의 덩어리 (작은 건 버림)
+    const comps = (ok) => {
+      const seen = new Uint8Array(n), st = [], res = [];
       for (let i = 0; i < n; i++) {
         if (seen[i] || !ok(i)) continue;
         const list = []; st.push(i); seen[i] = 1;
         while (st.length) { const k = st.pop(); list.push(k); for (const q of nbrs(k)) if (q >= 0 && !seen[q] && ok(q)) { seen[q] = 1; st.push(q); } }
-        if (!best || list.length > best.length) best = list;
+        if (list.length >= n * 0.006) res.push(list);
       }
-      return best;
+      return res;
     };
-    // 덩어리 → 네 귀퉁이 (왼위·오위·오아래·왼아래), 네모 모양인지 확인
-    const toQuad = (members, minFill) => {
-      if (!members || members.length < n * 0.03) return null;
+    let best = null;
+    // 덩어리 → 네 귀퉁이와 점수
+    const consider = (members, bonus) => {
       let tl, tr, br, bl, a = 1e9, b = -1e9, cm = -1e9, d = 1e9;
       for (const k of members) { const x = k % W, y = (k / W) | 0;
         if (x + y < a) { a = x + y; tl = [x, y]; } if (x - y > b) { b = x - y; tr = [x, y]; }
         if (x + y > cm) { cm = x + y; br = [x, y]; } if (x - y < d) { d = x - y; bl = [x, y]; } }
       const q = [tl, tr, br, bl];
       const area = Math.abs(q.reduce((s, p, i) => { const r = q[(i + 1) % 4]; return s + p[0] * r[1] - r[0] * p[1]; }, 0)) / 2;
-      if (area < n * 0.03 || members.length / area < minFill) return null;
-      if (q.every(([x, y]) => x <= 1 || y <= 1 || x >= W - 2 || y >= Hh - 2)) return null;   // 사진 전체 = TV 아님
-      const k = c.width / W;
-      return q.map(([x, y]) => [x * k + k / 2, y * k + k / 2]);
+      const af = area / n, fill = members.length / Math.max(1, area);
+      if (af < 0.006 || af > 0.92 || fill < 0.62) return;
+      if (q.filter(([x, y]) => x <= 1 || y <= 1 || x >= W - 2 || y >= Hh - 2).length >= 2) return;   // 사진 가장자리에 걸친 건 TV가 아님
+      const L = (p, r) => Math.hypot(p[0] - r[0], p[1] - r[1]);
+      const aspect = (L(q[0], q[1]) + L(q[3], q[2])) / Math.max(1, L(q[0], q[3]) + L(q[1], q[2]));
+      const asp = Math.exp(-Math.pow(Math.log(aspect / 1.75), 2) / (2 * 0.3 * 0.3));
+      const score = Math.min(1, fill) ** 2 * asp * (0.35 + Math.sqrt(af)) + bonus;
+      if (!best || score > best.score) best = { q, score };
     };
-    // 1) 검은 테두리: 아주 어두운 칸을 벽으로 보고, 사진 가장자리에서 닿지 않는 안쪽 영역
-    const dark = Math.min(48, Math.max(18, lum.reduce((s, v) => s + v, 0) / n * 0.35));
+    // 아주 어두운 칸(테두리) 기준: 사진 가장자리에서 어둡지 않은 칸을 따라 닿는 곳 = TV 바깥
+    const dark = Math.min(50, Math.max(18, mean * 0.35));
     const out = new Uint8Array(n), st = [];
-    for (let x = 0; x < W; x++) for (const y of [0, Hh - 1]) { const k = y * W + x; if (lum[k] > dark && !out[k]) { out[k] = 1; st.push(k); } }
-    for (let y = 0; y < Hh; y++) for (const x of [0, W - 1]) { const k = y * W + x; if (lum[k] > dark && !out[k]) { out[k] = 1; st.push(k); } }
+    const seed = (k) => { if (lum[k] > dark && !out[k]) { out[k] = 1; st.push(k); } };
+    for (let x = 0; x < W; x++) { seed(x); seed((Hh - 1) * W + x); }
+    for (let y = 0; y < Hh; y++) { seed(y * W); seed(y * W + W - 1); }
     while (st.length) { const k = st.pop(); for (const q of nbrs(k)) if (q >= 0 && !out[q] && lum[q] > dark) { out[q] = 1; st.push(q); } }
-    const inner = toQuad(biggest((i) => !out[i] && lum[i] > dark), 0.8);
-    if (inner) return inner;
-    // 2) 밝은 큰 네모 (오츠 방식으로 밝음/어두움 경계)
+    for (const m of comps((i) => !out[i] && lum[i] > dark)) consider(m, 0.08);   // A
+    for (const m of comps((i) => !out[i])) consider(m, 0);                        // B
+    // C) 밝은 네모: 오츠 경계와 그보다 밝은 경계 두 가지
     let sum = 0; for (let i = 0; i < 256; i++) sum += i * hist[i];
-    let sB = 0, wB = 0, best = 0, th = 128;
-    for (let i = 0; i < 256; i++) { wB += hist[i]; if (!wB) continue; const wF = n - wB; if (!wF) break; sB += i * hist[i]; const mB = sB / wB, mF = (sum - sB) / wF, v = wB * wF * (mB - mF) * (mB - mF); if (v > best) { best = v; th = i; } }
-    return toQuad(biggest((i) => lum[i] > th), 0.6);
+    let sB = 0, wB = 0, bv = 0, th = 128;
+    for (let i = 0; i < 256; i++) { wB += hist[i]; if (!wB) continue; const wF = n - wB; if (!wF) break; sB += i * hist[i]; const mB = sB / wB, mF = (sum - sB) / wF, v = wB * wF * (mB - mF) * (mB - mF); if (v > bv) { bv = v; th = i; } }
+    for (const T of [th, Math.round((th + 255) / 2)]) for (const m of comps((i) => lum[i] > T)) consider(m, 0);
+    if (!best || best.score < 0.22) return null;
+    const k = c.width / W;
+    return best.q.map(([x, y]) => [x * k + k / 2, y * k + k / 2]);
   },
 
   // 네 모서리 → 0~1 정사각형 (투시 변환)
@@ -2110,11 +2132,20 @@ var cam = {
     return [(h[0] * x + h[1] * y + h[2]) / w, (h[3] * x + h[4] * y + h[5]) / w];
   },
 
+  // 모서리 맞추기: 왼쪽 위 → 오른쪽 위 → 오른쪽 아래 → 왼쪽 아래 순서로 네 번 누르기
+  CORNER: ['왼쪽 위', '오른쪽 위', '오른쪽 아래', '왼쪽 아래'],
   setEdit(on) {
-    this.edit = on; $('#camEdit').setAttribute('aria-pressed', on); $('#camEdit').textContent = on ? '완료' : '모서리';
-    if (on) this.msg('<b>TV 화면 네 귀퉁이</b>를 하나씩 눌러 맞추세요. 누른 곳에서 가장 가까운 동그라미가 옮겨 와요. 다 되면 <b>완료</b>.');
-    else if (this.frame) this.msg('사진 속 TV 화면을 누르면 TV에서 클릭해요.');
+    this.edit = on; this.step = 0;
+    $('#camEdit').setAttribute('aria-pressed', on); $('#camEdit').textContent = on ? '취소' : '모서리';
+    if (on) { this.askCorner(); this.stage(1); }
+    else if (this.frame) { this.msg('사진 속 TV를 누르면 TV에서 클릭해요.'); this.stage(2); }
     this.draw();
+  },
+  askCorner() { this.msg(`TV 화면의 <b>${this.CORNER[this.step]} 귀퉁이</b>를 누르세요 (${this.step + 1}/4)`); },
+  setCorner(p) {
+    this.quad[this.step] = p; this.step++;
+    if (this.step < 4) { this.askCorner(); this.draw(); return; }
+    this.solve(); this.setEdit(false); this.msg('맞췄어요. 이제 사진 속 TV를 누르면 TV에서 클릭해요.');
   },
   // 사진 위 표시: TV 테두리 (모서리 맞추는 중에는 동그라미도)
   draw() {
@@ -2122,7 +2153,7 @@ var cam = {
     svg.setAttribute('viewBox', `0 0 ${c.width} ${c.height}`);
     const r = Math.max(c.width, c.height) / 45;
     svg.innerHTML = `<polygon points="${this.quad.map(p => p.join(',')).join(' ')}" class="q"/>` +
-      (this.edit ? this.quad.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="${r}" class="h"/>`).join('') : '');
+      (this.edit ? this.quad.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="${r}" class="h${i === this.step ? ' next' : ''}"/>`).join('') : '');
   },
   // 화면 터치 좌표 → 사진 픽셀 좌표
   toPhoto(e) {
@@ -2183,12 +2214,7 @@ function bindCamera() {
   let drag = -1, downAt = 0, down = null, longT = 0, longDone = false;
   stage.addEventListener('pointerdown', (e) => {
     if ($('#camCanvas').hidden || !cam.frame) return;
-    if (cam.edit) {   // 모서리 맞추기: 가장 가까운 모서리를 누른 곳으로
-      const p = cam.toPhoto(e);
-      drag = cam.quad.reduce((bi, q, i) => Math.hypot(q[0] - p[0], q[1] - p[1]) < Math.hypot(cam.quad[bi][0] - p[0], cam.quad[bi][1] - p[1]) ? i : bi, 0);
-      cam.quad[drag] = p; cam.solve(); cam.draw();
-      try { stage.setPointerCapture(e.pointerId); } catch (_) {} e.preventDefault(); return;
-    }
+    if (cam.edit) { cam.setCorner(cam.toPhoto(e)); e.preventDefault(); return; }   // 모서리 맞추기: 순서대로 한 곳씩
     down = cam.toPhoto(e); downAt = Date.now(); longDone = false;
     clearTimeout(longT); longT = setTimeout(() => { longDone = true; cam.tap(down[0], down[1], 2); }, 550);   // 길게 = 오른쪽 클릭
   });
@@ -2203,9 +2229,9 @@ function bindCamera() {
     down = null;
   };
   stage.addEventListener('pointerup', up); stage.addEventListener('pointercancel', () => { drag = -1; down = null; clearTimeout(longT); });
-  $('#camShot').onclick = async () => { if (!cam.stream && !(await cam.start())) return; if ($('#camCanvas').hidden) cam.capture(false); else { cam.live(true); cam.msg('TV가 화면에 들어오게 비추고 <b>찍기</b>를 누르세요.'); } cam.setZoom(cam.zoom); };
+  $('#camShot').onclick = async () => { if (!cam.stream && !(await cam.start())) return; if ($('#camCanvas').hidden) cam.capture(false); else { cam.setEdit(false); cam.live(true); cam.msg('TV가 크게 보이게 비추고 <b>찍기</b>를 누르세요.'); cam.stage(0); } cam.setZoom(cam.zoom); };
   $('#camZoom').onclick = () => cam.setZoom(cam.zoom >= 3 ? 1 : cam.zoom + 1);
-  $('#camEdit').onclick = () => { if (!cam.frame || $('#camCanvas').hidden) { ui.toast('먼저 찍기를 눌러 주세요.'); return; } cam.setEdit(!cam.edit); };
+  $('#camEdit').onclick = () => { if (!cam.frame || $('#camCanvas').hidden) { ui.toast('먼저 찍기를 눌러 주세요.'); return; } if (cam.edit) { cam.solve(); cam.setEdit(false); } else cam.setEdit(true); };
   $('#camAuto').onclick = () => { cam.s.auto = !cam.s.auto; save(); syncCam(); };
   $('#camRel').onclick = () => { const d = dongles.get(current); if (!d) return; const c = cfgOf(d.id); c.camRel = !c.camRel; save(); syncCam(); ui.toast(c.camRel ? '커서를 옮겨서 클릭하는 방식으로 바꿨어요 (대략 맞춤)' : '누른 위치로 바로 클릭하는 방식으로 바꿨어요'); };
   $$('#padMode button').forEach(b => b.onclick = () => { store.padMode = b.dataset.pm; save(); syncPadMode(); });
