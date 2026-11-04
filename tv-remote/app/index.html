@@ -161,26 +161,33 @@ details.more .grid { margin-top: 12px; }
 }
 .hanpill.ko { color: var(--accent-ink); background: var(--grad); border-color: transparent; }
 /* 카메라로 보며 터치 */
-.cambox { display: grid; gap: 10px; }
-.camstage { --ar: 1.333; position: relative; width: min(100%, calc(52dvh * var(--ar))); aspect-ratio: var(--ar); margin: 0 auto;
-  background: #000; border-radius: 16px; overflow: hidden; touch-action: none; border: 1px solid var(--line); user-select: none; -webkit-user-select: none; }
-.caminner { position: absolute; inset: 0; transform-origin: 0 0; transition: transform 0.2s; }
+.cambox { display: flex; flex-direction: column; gap: 10px; height: calc(100dvh - 300px - env(safe-area-inset-bottom, 0px)); min-height: 320px; }
+.cambox[hidden] { display: none; }
+.cambox > .camstage { flex: 1; min-height: 0; }
+.cambox > .shutter { flex: none; }
+.camstage { position: relative; width: 100%;
+  background: #000; border-radius: 18px; overflow: hidden; touch-action: none; border: 1px solid var(--line); user-select: none; -webkit-user-select: none; }
+.caminner { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 0 0; }
+.caminner.anim { transition: transform 0.25s ease; }
 .caminner video, .caminner canvas, .caminner svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .caminner video[hidden], .caminner canvas[hidden] { display: none; }
-#camOverlay .q { fill: color-mix(in srgb, var(--accent) 14%, transparent); stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; }
-#camOverlay .h { fill: color-mix(in srgb, var(--accent) 45%, transparent); stroke: var(--fg); stroke-width: 2; vector-effect: non-scaling-stroke; }
-#camOverlay .h.next { fill: color-mix(in srgb, var(--warn) 70%, transparent); stroke-width: 3; }
-#camOverlay .rp { fill: none; stroke: var(--ok); stroke-width: 3; vector-effect: non-scaling-stroke; pointer-events: none; animation: camrp 0.7s ease-out forwards; }
+#camOverlay { pointer-events: none; }
+#camOverlay .q { fill: color-mix(in srgb, var(--accent) 12%, transparent); stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+#camOverlay polyline.q { fill: none; stroke-dasharray: 6 4; }
+#camOverlay .h { fill: var(--warn); stroke: var(--bg); stroke-width: 2; vector-effect: non-scaling-stroke; }
+#camOverlay .rp { fill: none; stroke: var(--ok); stroke-width: 3; vector-effect: non-scaling-stroke; animation: camrp 0.7s ease-out forwards; }
+#camOverlay .rp.r2 { stroke: var(--accent-2); }
 @keyframes camrp { from { opacity: 1; } to { opacity: 0; } }
-.cammsg { margin: 0; font-size: 14px; color: var(--fg); font-weight: 600; }
-.camsteps { margin: 0; padding-left: 20px; display: grid; gap: 3px; font-size: 12.5px; color: var(--muted); }
-.camsteps b { color: var(--fg); font-weight: 600; }
-.camsteps li.on { color: var(--fg); }
-.camsteps li.on::marker { color: var(--accent); font-weight: 700; }
-.cammsg small { display: block; color: var(--muted); font-size: 12px; }
-.cambtns { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; }
-.cambtns .key[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent); color: var(--fg); }
-.cambtns .key { min-height: 50px; }
+.campill { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); max-width: calc(100% - 20px); width: max-content;
+  background: rgb(0 0 0 / 0.62); color: var(--fg); font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 999px; pointer-events: none; text-align: center; }
+.campill.warn { background: color-mix(in srgb, var(--warn) 90%, #000); color: var(--bg); }
+.camfix { position: absolute; right: 8px; top: 8px; border: 1px solid rgb(255 255 255 / 0.25); background: rgb(0 0 0 / 0.55); color: var(--fg);
+  font-size: 12.5px; font-weight: 600; padding: 6px 10px; border-radius: 999px; cursor: pointer; }
+.camfix.on { background: var(--warn); color: var(--bg); border-color: transparent; }
+.shutter { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 56px; border: 0; border-radius: 16px; cursor: pointer;
+  background: var(--grad); color: var(--accent-ink); font-size: 16px; font-weight: 700; touch-action: manipulation; }
+.shutter svg { width: 22px; height: 22px; }
+.shutter:active { transform: scale(0.98); }
 .padbox { border: 1px solid var(--line); border-radius: 20px; overflow: hidden; background: var(--panel); }
 .touchpad {
   height: calc(100vh - 380px); min-height: 220px; max-height: 520px;
@@ -334,7 +341,7 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
   /* 터치패드: 왼쪽 = 글자 입력, 오른쪽 = 패드 */
   .pad-view > .typebar, .pad-view > #padMode { grid-column: 1; }
   .pad-view > .padbox, .pad-view > .cambox { grid-row: 1 / span 3; }
-  .camstage { width: min(100%, calc(70dvh * var(--ar))); }
+  .cambox { height: calc(100dvh - 150px); }
   .pad-view .touchpad { height: calc(100vh - 260px); max-height: none; min-height: 200px; }
 
   /* 클리커: 왼쪽 = 설정·보조 버튼, 오른쪽 = 이전/다음 */
@@ -482,21 +489,11 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
           <canvas id="camCanvas" hidden></canvas>
           <svg id="camOverlay" style="display:none"></svg>
         </div>
+        <button class="camfix" id="camFix" hidden>모서리 맞추기</button>
+        <div class="campill" id="camMsg">카메라를 켜는 중…</div>
       </div>
-      <p class="cammsg" id="camMsg">카메라를 켜는 중…</p>
-      <div class="cambtns">
-        <button class="key accent" id="camShot">찍기</button>
-        <button class="key" id="camEdit" aria-pressed="false">모서리</button>
-        <button class="key" id="camZoom">확대 1×</button>
-      </div>
-      <ol class="camsteps" id="camSteps">
-        <li data-s="0"><b>찍기</b>: TV가 크게 보이게 비추고 누르기</li>
-        <li data-s="1"><b>확인</b>: 파란 테두리가 TV 화면에 맞는지 보기 (안 맞으면 <b>모서리</b>)</li>
-        <li data-s="2"><b>누르기</b>: 사진 속 TV를 누르면 TV에서 클릭 · 길게 = 오른쪽 클릭 · 글자는 위 입력칸</li>
-      </ol>
-      <div class="volrow"><span class="grow">누른 뒤 자동으로 다시 찍기<small>결과를 바로 확인 (휴대폰을 크게 움직이지 마세요)</small></span><button class="toggle" id="camAuto" aria-pressed="true">켬</button></div>
-      <div class="volrow"><span class="grow">TV가 누른 곳으로 안 가면<small>커서를 옮겨서 클릭 (대략 맞춤, 일부 스마트 TV용)</small></span><button class="toggle" id="camRel" aria-pressed="false">끔</button></div>
-      <p class="hint" id="camFwNote" hidden>동글 펌웨어를 1.6.0 이상으로 올리면 누른 곳을 정확히 클릭해요. 지금은 커서를 옮겨서 대략 맞춰요.</p>
+      <p class="hint" id="camFwNote" hidden>지금 동글은 커서를 옮겨서 대략 클릭해요. 펌웨어를 1.6.0으로 올리면 누른 곳을 정확히 클릭해요.</p>
+      <button class="shutter" id="camShot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l1.6-2.4h6.8L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.6"/></svg><span id="camShotTxt">찍기</span></button>
     </div>
   </section>
 
@@ -1090,6 +1087,7 @@ const ui = {
           ${d.demo ? '' : `<dt>펌웨어</dt><dd id="fwRow">${fw.rowHtml(d)}</dd>`}
           ${d.diag ? `<dt>진단</dt><dd>${esc(d.diag)}</dd>` : ''}
           <dt>한/영 전환</dt><dd>${esc(HAN_KEYS[hanKeyOf(d.id)][0])} <button class="btn sm" id="hanSetBtn">바꾸기</button></dd>
+          ${d.demo ? '' : `<dt>카메라 터치</dt><dd>${c.camRel ? '커서를 옮겨서 (대략)' : '누른 곳 바로'} <button class="btn sm" id="camRelBtn">바꾸기</button></dd>`}
           ${d.uc !== undefined ? `<dt>USB 방식</dt><dd>${d.uc ? '호환 모드 (키보드만)' : '표준 (키보드·마우스·미디어키)'} <button class="btn sm" id="ucBtn">${d.uc ? '표준으로' : '호환 모드로'}</button></dd>` : ''}
         </dl>
         <label class="label" for="nameIn">이 TV 이름</label>
@@ -1137,6 +1135,7 @@ const ui = {
         </div>
       </div>`;
     fw.bind(d);
+    const crb = $('#camRelBtn'); if (crb) crb.onclick = () => { c.camRel = !c.camRel; save(); this.render(); this.toast(c.camRel ? '카메라로 누르면 커서를 옮겨서 클릭해요 (누른 곳으로 바로 안 가는 TV용)' : '카메라로 누른 곳을 바로 클릭해요'); };
     const hsb = $('#hanSetBtn'); if (hsb) hsb.onclick = () => window.openHanSettings && window.openHanSettings();
     const ucb = $('#ucBtn'); if (ucb) ucb.onclick = () => confirmSheet(d.uc ? '표준 방식으로 바꿀까요?' : '호환 모드로 바꿀까요?',
       d.uc ? '키보드·마우스·미디어키를 모두 쓰는 방식이에요. 대부분의 스마트TV는 이쪽이 맞아요.' : 'TV가 동글을 아예 인식하지 못할 때만 쓰세요. 키보드는 되지만 터치패드(마우스)와 음량·홈 같은 미디어키는 안 될 수 있어요.',
@@ -1992,61 +1991,78 @@ function bindShare() {
 }
 
 /* ---------------- 터치패드: 카메라로 TV를 보며 터치 ---------------- */
-// 휴대폰 카메라로 TV를 찍고, 사진 속 TV 화면에서 누른 곳을 TV에서 클릭함 (블루투스 → 동글).
-// 사진 위에서 누르므로 손이 흔들려도 정확. TV 네 모서리는 자동으로 찾고, 못 찾으면 직접 끌어 맞춤.
+// 찍기 → TV를 찾아 TV가 꽉 차게 확대 → 사진 속 TV를 누르면 그 자리를 TV에서 클릭 (블루투스 → 동글).
+// 사진 위에서 누르므로 손이 흔들려도 정확. 못 찾으면 귀퉁이 네 곳을 차례로 눌러 맞춤.
+// 손가락: 톡 = 클릭, 길게 = 오른쪽 클릭, 끌기 = 옮기기, 두 손가락 = 확대·축소
 var cam = {
   stream: null, frame: null,          // frame = 마지막으로 찍은 사진 (canvas)
   quad: null,                         // 사진 속 TV 네 모서리 [[x,y]*4] 왼위·오위·오아래·왼아래 (사진 픽셀)
   H: null,                            // 사진 좌표 → TV 화면(0~1) 변환
-  zoom: 1, busy: false, refreshT: 0, edit: false, step: 0,   // edit = 모서리 맞추는 중 (step = 다음에 누를 귀퉁이)
-  // 안내 단계 표시 (0 찍기, 1 확인·모서리, 2 누르기)
-  stage(i) { $$('#camSteps li').forEach(li => li.classList.toggle('on', +li.dataset.s === i)); },
-  get s() { const o = store.cam || (store.cam = {}); if (!('auto' in o)) o.auto = true; return o; },
+  view: { s: 1, tx: 0, ty: 0 },       // 사진 확대·이동
+  edit: false, step: 0, refreshT: 0,
 
   async start() {
     if (this.stream) return true;
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { this.msg('이 화면에서는 카메라를 쓸 수 없어요.'); return false; }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { this.msg('이 화면에서는 카메라를 쓸 수 없어요'); return false; }
+    this.msg('카메라를 켜는 중…');
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } });
-    } catch (e) {
-      this.msg('카메라를 켜지 못했어요. 카메라 권한을 허용해 주세요.'); return false;
-    }
+    } catch (e) { this.msg('카메라 권한을 허용해 주세요'); return false; }
     const v = $('#camVideo'); v.srcObject = this.stream;
     v.onloadedmetadata = () => this.fit(v.videoWidth, v.videoHeight);
     try { await v.play(); } catch (e) {}
     this.fit(v.videoWidth, v.videoHeight);
-    this.live(true);
-    this.msg('TV가 크게 보이게 비추고 <b>찍기</b>를 누르세요.'); this.stage(0);
+    this.live();
     return true;
   },
   stop() {
     if (this.stream) { this.stream.getTracks().forEach(t => t.stop()); this.stream = null; }
     clearTimeout(this.refreshT);
   },
-  // 화면 칸을 영상 비율에 딱 맞춤 (누른 위치 계산이 어긋나지 않게)
-  fit(w, h) { if (w && h) $('#camStage').style.setProperty('--ar', (w / h).toFixed(4)); },
-  msg(h) { const m = $('#camMsg'); if (m) m.innerHTML = h; },
-  live(on) {
-    $('#camVideo').hidden = !on; $('#camCanvas').hidden = on; $('#camOverlay').style.display = on ? 'none' : '';
-    $('#camShot').textContent = on ? '찍기' : '다시 찍기';
+  // 사진 위 한 줄 안내 (warn = 강조). 잠깐 보이는 안내(brief)는 TV를 가리지 않게 2.5초 뒤 사라짐
+  msg(text, warn, brief) {
+    const m = $('#camMsg'); if (!m) return;
+    clearTimeout(this.msgT);
+    m.textContent = text; m.classList.toggle('warn', !!warn); m.hidden = !text;
+    if (brief) this.msgT = setTimeout(() => { m.hidden = true; }, 2500);
   },
+  ar: 16 / 9, box: { iw: 1, ih: 1 },
+  // 사진(영상) 비율을 기억하고, 칸 안에 비율 그대로 들어가는 크기를 계산
+  fit(w, h) { if (w && h) this.ar = w / h; this.layout(); },
+  layout() {
+    const st = $('#camStage'), W = st.clientWidth, H = st.clientHeight; if (!W || !H) return;
+    const iw = W / H > this.ar ? H * this.ar : W, ih = iw / this.ar;
+    this.box = { iw, ih };
+    const inner = $('#camInner'); inner.style.width = iw + 'px'; inner.style.height = ih + 'px';
+    this.setView(this.view.s, this.view.tx, this.view.ty);
+  },
+  live() {
+    this.setEdit(false, true);
+    $('#camVideo').hidden = false; $('#camCanvas').hidden = true; $('#camOverlay').style.display = 'none';
+    $('#camFix').hidden = true; this.setView(1, -1e9, -1e9);
+    $('#camShotTxt').textContent = '찍기';
+    this.msg('TV를 화면에 담고 찍으세요');
+  },
+  frozen() { return !$('#camCanvas').hidden && !!this.frame; },
 
-  // 지금 카메라 화면을 사진으로 고정
-  capture(keepQuad) {
+  // 지금 카메라 화면을 사진으로 고정. again = 클릭 뒤 결과 확인용 (확대 상태·모서리 유지)
+  capture(again) {
     const v = $('#camVideo');
-    if (!this.stream || !v.videoWidth) { this.msg('카메라가 아직 준비되지 않았어요.'); return false; }
+    if (!this.stream || !v.videoWidth) { this.msg('카메라가 아직 준비되지 않았어요', true); return false; }
     const c = $('#camCanvas'); c.width = v.videoWidth; c.height = v.videoHeight; this.fit(c.width, c.height);
     c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
     this.frame = c;
+    $('#camVideo').hidden = true; c.hidden = false; $('#camOverlay').style.display = '';
+    $('#camShotTxt').textContent = '다시 찍기'; $('#camFix').hidden = false;
     const found = this.detect(c);
-    if (found) { this.quad = found; this.setEdit(false); this.msg('TV를 찾았어요. 파란 테두리가 맞으면 사진 속 TV를 눌러 조작하세요.'); this.stage(2); }
-    else if (keepQuad && this.quad) { /* 손을 거의 안 움직였다고 보고 이전 모서리 그대로 */ }
+    if (found) this.quad = found;
+    if (again && this.quad) { this.solve(); this.draw(); return true; }
+    if (found) { this.solve(); this.setEdit(false); this.autoFit(); this.msg('TV를 누르면 클릭돼요 · 길게 = 오른쪽 클릭', false, true); }
     else {
       const w = c.width, h = c.height;
       this.quad = [[w * 0.2, h * 0.22], [w * 0.8, h * 0.22], [w * 0.8, h * 0.78], [w * 0.2, h * 0.78]];
-      this.setEdit(true);
+      this.setView(1, -1e9, -1e9); this.setEdit(true);
     }
-    this.live(false); this.solve(); this.draw();
     return true;
   },
 
@@ -2132,56 +2148,67 @@ var cam = {
     return [(h[0] * x + h[1] * y + h[2]) / w, (h[3] * x + h[4] * y + h[5]) / w];
   },
 
-  // 모서리 맞추기: 왼쪽 위 → 오른쪽 위 → 오른쪽 아래 → 왼쪽 아래 순서로 네 번 누르기
+  // 모서리 맞추기: 왼쪽 위 → 오른쪽 위 → 오른쪽 아래 → 왼쪽 아래 순서로 한 번씩 누르기
   CORNER: ['왼쪽 위', '오른쪽 위', '오른쪽 아래', '왼쪽 아래'],
-  setEdit(on) {
+  setEdit(on, quiet) {
     this.edit = on; this.step = 0;
-    $('#camEdit').setAttribute('aria-pressed', on); $('#camEdit').textContent = on ? '취소' : '모서리';
-    if (on) { this.askCorner(); this.stage(1); }
-    else if (this.frame) { this.msg('사진 속 TV를 누르면 TV에서 클릭해요.'); this.stage(2); }
+    const f = $('#camFix'); f.textContent = on ? '취소' : '모서리 맞추기'; f.classList.toggle('on', on);
+    if (on) this.ask();
+    else if (!quiet && this.frame) this.msg('TV를 누르면 클릭돼요 · 길게 = 오른쪽 클릭', false, true);
     this.draw();
   },
-  askCorner() { this.msg(`TV 화면의 <b>${this.CORNER[this.step]} 귀퉁이</b>를 누르세요 (${this.step + 1}/4)`); },
+  ask() { this.msg(`TV 화면의 ${this.CORNER[this.step]} 귀퉁이를 누르세요 (${this.step + 1}/4)`, true); },
   setCorner(p) {
     this.quad[this.step] = p; this.step++;
-    if (this.step < 4) { this.askCorner(); this.draw(); return; }
-    this.solve(); this.setEdit(false); this.msg('맞췄어요. 이제 사진 속 TV를 누르면 TV에서 클릭해요.');
+    if (this.step < 4) { this.ask(); this.draw(); return; }
+    this.solve(); this.setEdit(false); this.autoFit();
   },
-  // 사진 위 표시: TV 테두리 (모서리 맞추는 중에는 동그라미도)
+  // 사진 위 표시: TV 테두리 (모서리 맞추는 중에는 귀퉁이 점도)
   draw() {
-    const svg = $('#camOverlay'), c = this.frame; if (!c || !this.quad) return;
+    const svg = $('#camOverlay'), c = this.frame; if (!c || !this.quad) { if (svg) svg.innerHTML = ''; return; }
     svg.setAttribute('viewBox', `0 0 ${c.width} ${c.height}`);
-    const r = Math.max(c.width, c.height) / 45;
-    svg.innerHTML = `<polygon points="${this.quad.map(p => p.join(',')).join(' ')}" class="q"/>` +
-      (this.edit ? this.quad.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="${r}" class="h${i === this.step ? ' next' : ''}"/>`).join('') : '');
+    const r = Math.max(c.width, c.height) / 55;
+    const pts = this.edit ? this.quad.slice(0, this.step) : this.quad;
+    svg.innerHTML = (this.edit ? (pts.length > 1 ? `<polyline points="${pts.map(p => p.join(',')).join(' ')}" class="q"/>` : '')
+      : `<polygon points="${this.quad.map(p => p.join(',')).join(' ')}" class="q"/>`) +
+      (this.edit ? pts.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="${r}" class="h"/>`).join('') : '');
   },
-  // 화면 터치 좌표 → 사진 픽셀 좌표
-  toPhoto(e) {
+  // 화면 터치 좌표 → 사진 픽셀 좌표 (확대·이동을 반영)
+  toPhoto(x, y) {
     const r = $('#camCanvas').getBoundingClientRect(), c = this.frame;
-    return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height];
+    return [(x - r.left) * c.width / r.width, (y - r.top) * c.height / r.height];
   },
-  setZoom(z) {
-    this.zoom = z; $('#camZoom').textContent = `확대 ${z}×`;
-    const stage = $('#camStage'), inner = $('#camInner');
-    if (z === 1 || !this.quad || !this.frame) { inner.style.transform = ''; return; }
-    // TV 가운데가 화면 가운데 오도록 확대
-    const cx = this.quad.reduce((s, p) => s + p[0], 0) / 4 / this.frame.width, cy = this.quad.reduce((s, p) => s + p[1], 0) / 4 / this.frame.height;
-    const W = stage.clientWidth, H = stage.clientHeight;
-    const tx = clamp(W / 2 - cx * W * z, W - W * z, 0), ty = clamp(H / 2 - cy * H * z, H - H * z, 0);
-    inner.style.transform = `translate(${tx}px, ${ty}px) scale(${z})`;
+  // 확대·이동. 사진이 칸보다 작으면 가운데, 크면 칸 밖으로 빈 곳이 생기지 않게
+  setView(s, tx, ty) {
+    const st = $('#camStage'), W = st.clientWidth, H = st.clientHeight, { iw, ih } = this.box;
+    s = clamp(s, 1, 8);
+    const fitX = (t, w, Wt) => w * s <= Wt ? (Wt - w * s) / 2 : clamp(t, Wt - w * s, 0);
+    this.view = { s, tx: fitX(tx, iw, W), ty: fitX(ty, ih, H) };
+    $('#camInner').style.transform = `translate(${this.view.tx}px, ${this.view.ty}px) scale(${s})`;
+  },
+  // 찾은 TV가 칸에 꽉 차게
+  autoFit() {
+    if (!this.quad || !this.frame) return;
+    const st = $('#camStage'), W = st.clientWidth, H = st.clientHeight, k = this.box.iw / this.frame.width;
+    const xs = this.quad.map(p => p[0] * k), ys = this.quad.map(p => p[1] * k);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const s = clamp(Math.min(W / (x1 - x0), H / (y1 - y0)) * 0.9, 1, 8);
+    $('#camInner').classList.add('anim');
+    this.setView(s, W / 2 - (x0 + x1) / 2 * s, H / 2 - (y0 + y1) / 2 * s);
+    setTimeout(() => $('#camInner').classList.remove('anim'), 260);
   },
 
   // 누른 곳 클릭 (button 1 = 왼쪽, 2 = 오른쪽)
-  async tap(x, y, button) {
+  tap(x, y, button) {
     const uv = this.toTv(x, y);
     if (!uv) return;
     const [u, v] = uv;
-    if (u < -0.02 || u > 1.02 || v < -0.02 || v > 1.02) { ui.toast('TV 화면 밖을 눌렀어요.'); return; }
-    this.ripple(x, y);
-    const ux = clamp(u, 0, 1), vy = clamp(v, 0, 1);
+    if (u < -0.02 || u > 1.02 || v < -0.02 || v > 1.02) { this.msg('TV 화면 밖을 눌렀어요', true, true); return; }
     const ts = targets();
-    if (!ts.length) { ui.toast('연결된 TV가 없어요.'); return; }
+    if (!ts.length) { this.msg('연결된 TV가 없어요', true); return; }
+    this.ripple(x, y, button);
     if (navigator.vibrate) navigator.vibrate(10);
+    const ux = clamp(u, 0, 1), vy = clamp(v, 0, 1);
     for (const d of ts) {
       const abs = !d.phone && !cfgOf(d.id).camRel && d.fw && !fw.newer('1.6.0', d.fw);
       if (abs) {
@@ -2189,13 +2216,15 @@ var cam = {
         d.write([OP.ABS_CLICK, X & 255, X >> 8, Y & 255, Y >> 8, button], true).catch(() => {});
       } else relClick(d, ux, vy, button);
     }
-    // 잠시 뒤 다시 찍어 결과를 보여 줌
-    if (this.s.auto) { clearTimeout(this.refreshT); this.refreshT = setTimeout(() => { if (!$('#camCanvas').hidden) this.capture(true); }, 1100); }
+    this.msg(button === 2 ? '오른쪽 클릭했어요' : '클릭했어요', false, true);
+    // 잠시 뒤 다시 찍어 TV가 어떻게 바뀌었는지 보여 줌 (확대·모서리 그대로)
+    clearTimeout(this.refreshT);
+    this.refreshT = setTimeout(() => { if (this.frozen() && !this.edit) this.capture(true); }, 1100);
   },
-  ripple(x, y) {
-    const svg = $('#camOverlay'), c = this.frame, r = Math.max(c.width, c.height) / 30;
+  ripple(x, y, button) {
+    const svg = $('#camOverlay'), c = this.frame, r = Math.max(c.width, c.height) / 28 / this.view.s;
     const el = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    el.setAttribute('cx', x); el.setAttribute('cy', y); el.setAttribute('r', r); el.setAttribute('class', 'rp');
+    el.setAttribute('cx', x); el.setAttribute('cy', y); el.setAttribute('r', r); el.setAttribute('class', button === 2 ? 'rp r2' : 'rp');
     svg.appendChild(el); setTimeout(() => el.remove(), 700);
   },
 };
@@ -2209,46 +2238,69 @@ async function relClick(d, u, v, button) {
   await sleep(40);
   d.write([OP.CLICK, button], true).catch(() => {});
 }
+// 사진 위 손가락: 톡 = 클릭(찍기 전에는 찍기), 길게 = 오른쪽 클릭, 끌기 = 옮기기, 두 손가락 = 확대·축소
 function bindCamera() {
-  const stage = $('#camStage');
-  let drag = -1, downAt = 0, down = null, longT = 0, longDone = false;
+  const stage = $('#camStage'), pts = new Map();
+  let base = null, moved = false, longT = 0, longDone = false, start = null;
+  const snap = () => { base = { v: { ...cam.view }, pts: [...pts.values()].map(p => ({ ...p })) }; };
   stage.addEventListener('pointerdown', (e) => {
-    if ($('#camCanvas').hidden || !cam.frame) return;
-    if (cam.edit) { cam.setCorner(cam.toPhoto(e)); e.preventDefault(); return; }   // 모서리 맞추기: 순서대로 한 곳씩
-    down = cam.toPhoto(e); downAt = Date.now(); longDone = false;
-    clearTimeout(longT); longT = setTimeout(() => { longDone = true; cam.tap(down[0], down[1], 2); }, 550);   // 길게 = 오른쪽 클릭
+    if (e.target.closest('#camFix')) return;
+    try { stage.setPointerCapture(e.pointerId); } catch (_) {}
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); snap();
+    if (pts.size === 1) {
+      moved = false; longDone = false; start = { x: e.clientX, y: e.clientY };
+      clearTimeout(longT);
+      if (cam.frozen() && !cam.edit) longT = setTimeout(() => { if (!moved && pts.size === 1) { longDone = true; cam.tap(...cam.toPhoto(start.x, start.y), 2); } }, 550);
+    } else { clearTimeout(longT); moved = true; }
   });
   stage.addEventListener('pointermove', (e) => {
-    if (drag >= 0) { cam.quad[drag] = cam.toPhoto(e); cam.solve(); cam.draw(); return; }
-    if (down) { const p = cam.toPhoto(e); if (Math.hypot(p[0] - down[0], p[1] - down[1]) > cam.frame.width / 40) { clearTimeout(longT); down = null; } }
+    if (!pts.has(e.pointerId) || !base || !cam.frozen()) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const now = [...pts.values()], b = base.pts, v = base.v;
+    if (now.length === 1 && b.length === 1) {
+      const dx = now[0].x - b[0].x, dy = now[0].y - b[0].y;
+      if (!moved && Math.hypot(dx, dy) < 10) return;
+      moved = true; clearTimeout(longT);
+      cam.setView(v.s, v.tx + dx, v.ty + dy);
+    } else if (now.length >= 2 && b.length >= 2) {
+      const r = stage.getBoundingClientRect();
+      const d = (a, c) => Math.hypot(a.x - c.x, a.y - c.y) || 1;
+      const s = clamp(v.s * d(now[0], now[1]) / d(b[0], b[1]), 1, 8), k = s / v.s;
+      const m0 = { x: (b[0].x + b[1].x) / 2 - r.left, y: (b[0].y + b[1].y) / 2 - r.top }, m1 = { x: (now[0].x + now[1].x) / 2 - r.left, y: (now[0].y + now[1].y) / 2 - r.top };
+      cam.setView(s, m1.x - (m0.x - v.tx) * k, m1.y - (m0.y - v.ty) * k);   // 손가락 사이 지점이 그대로 손가락 밑에
+    }
   });
-  const up = () => {
-    if (drag >= 0) { drag = -1; return; }
+  const up = (e) => {
+    if (!pts.delete(e.pointerId)) return;
+    snap();
+    if (pts.size) return;
     clearTimeout(longT);
-    if (down && !longDone) cam.tap(down[0], down[1], 1);
-    down = null;
+    if (moved || longDone || !start) return;
+    if (!cam.frozen()) { cam.capture(false); return; }          // 찍기 전: 화면을 눌러도 찍힘
+    const p = cam.toPhoto(start.x, start.y);
+    if (cam.edit) cam.setCorner(p); else cam.tap(p[0], p[1], 1);
   };
-  stage.addEventListener('pointerup', up); stage.addEventListener('pointercancel', () => { drag = -1; down = null; clearTimeout(longT); });
-  $('#camShot').onclick = async () => { if (!cam.stream && !(await cam.start())) return; if ($('#camCanvas').hidden) cam.capture(false); else { cam.setEdit(false); cam.live(true); cam.msg('TV가 크게 보이게 비추고 <b>찍기</b>를 누르세요.'); cam.stage(0); } cam.setZoom(cam.zoom); };
-  $('#camZoom').onclick = () => cam.setZoom(cam.zoom >= 3 ? 1 : cam.zoom + 1);
-  $('#camEdit').onclick = () => { if (!cam.frame || $('#camCanvas').hidden) { ui.toast('먼저 찍기를 눌러 주세요.'); return; } if (cam.edit) { cam.solve(); cam.setEdit(false); } else cam.setEdit(true); };
-  $('#camAuto').onclick = () => { cam.s.auto = !cam.s.auto; save(); syncCam(); };
-  $('#camRel').onclick = () => { const d = dongles.get(current); if (!d) return; const c = cfgOf(d.id); c.camRel = !c.camRel; save(); syncCam(); ui.toast(c.camRel ? '커서를 옮겨서 클릭하는 방식으로 바꿨어요 (대략 맞춤)' : '누른 위치로 바로 클릭하는 방식으로 바꿨어요'); };
+  stage.addEventListener('pointerup', up);
+  stage.addEventListener('pointercancel', (e) => { pts.delete(e.pointerId); clearTimeout(longT); moved = true; snap(); });
+  $('#camShot').onclick = async () => {
+    if (!cam.stream && !(await cam.start())) return;
+    if (cam.frozen()) cam.live(); else cam.capture(false);
+  };
+  $('#camFix').onclick = (e) => { e.stopPropagation(); if (cam.edit) { cam.solve(); cam.setEdit(false); } else { cam.setView(1, 0, 0); cam.setEdit(true); } };
   $$('#padMode button').forEach(b => b.onclick = () => { store.padMode = b.dataset.pm; save(); syncPadMode(); });
+  window.addEventListener('resize', () => { if (!$('#camBox').hidden) { cam.layout(); if (cam.frozen() && !cam.edit) cam.autoFit(); } });
   syncPadMode();
 }
 function syncCam() {
-  $('#camAuto').setAttribute('aria-pressed', !!cam.s.auto); $('#camAuto').textContent = cam.s.auto ? '켬' : '끔';
-  const d = dongles.get(current), c = d ? cfgOf(d.id) : {};
-  $('#camRel').setAttribute('aria-pressed', !!c.camRel); $('#camRel').textContent = c.camRel ? '켬' : '끔';
-  const old = d && !d.phone && (!d.fw || fw.newer('1.6.0', d.fw));
+  const d = dongles.get(current);
+  const old = d && !d.phone && !d.demo && (!d.fw || fw.newer('1.6.0', d.fw)) && !cfgOf(d.id).camRel;
   $('#camFwNote').hidden = !old;
 }
 function syncPadMode() {
   const camMode = store.padMode === 'cam';
   $$('#padMode button').forEach(b => b.setAttribute('aria-pressed', (b.dataset.pm === 'cam') === camMode));
   $('#padBox').hidden = camMode; $('#camBox').hidden = !camMode;
-  if (camMode && !$('#v-pad').hidden) { cam.start(); syncCam(); } else cam.stop();
+  if (camMode && !$('#v-pad').hidden) { cam.start(); syncCam(); requestAnimationFrame(() => cam.layout()); } else cam.stop();
 }
 
 /* ---------------- 클리커 ---------------- */
