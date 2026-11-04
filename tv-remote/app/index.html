@@ -2241,10 +2241,8 @@ var cam = {
         d.write([OP.ABS_CLICK, X & 255, X >> 8, Y & 255, Y >> 8, button], true).catch(() => {});
       } else relClick(d, ux, vy, button);
     }
-    this.msg(button === 2 ? '오른쪽 클릭했어요' : '클릭했어요', false, true);
-    // 잠시 뒤 다시 찍어 TV가 어떻게 바뀌었는지 보여 줌 (확대·모서리 그대로)
-    clearTimeout(this.refreshT);
-    this.refreshT = setTimeout(() => { if (this.frozen() && !this.edit) this.capture(true); }, 1100);
+    // 누르면 클릭만 함. 사진은 그대로 (TV가 바뀐 걸 보려면 '다시 찍기')
+    this.msg(button === 2 ? '오른쪽 클릭했어요' : '클릭했어요 · TV가 바뀌면 다시 찍기', false, true);
   },
   ripple(x, y, button) {
     const svg = $('#camOverlay'), c = this.frame, r = Math.max(c.width, c.height) / 28 / this.view.s;
