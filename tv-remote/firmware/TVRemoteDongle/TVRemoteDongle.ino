@@ -64,7 +64,7 @@ static const int PIN_IR  = 4;   // 내장 IR LED
 static const int PIN_LED = 35;  // RGB LED (WS2812)
 static const int PIN_BTN = 41;  // 윗면 버튼
 
-static const char *FW_VERSION = "1.5.0";
+static const char *FW_VERSION = "1.6.0";
 
 // ---------------- BLE UUID ----------------
 #define SVC_UUID  "7e1a0001-5c2b-4f3a-9e7d-3c1b8a9f0a11"
@@ -86,6 +86,8 @@ enum : uint8_t {
   C_CC_DOWN = 0x0B,
   C_CC_UP = 0x0C,
   C_SYSTEM = 0x0D,   // [1=off 2=standby 3=wake]
+  C_ABS = 0x0E,      // [x u16 LE, y u16 LE, buttons] 화면 위치로 바로 (0~32767, 1.6.0부터)
+  C_ABS_CLICK = 0x0F, // [x u16 LE, y u16 LE, (button)] 그 위치로 가서 클릭
   C_IR = 0x20,       // [khz, repeat, gapLo, gapHi, durations(u16 LE)...]
   C_IR_BEGIN = 0x30, // [khz, repeat, gapLo, gapHi]
   C_IR_DATA = 0x31,  // [durations...]
@@ -111,6 +113,32 @@ USBHIDMouse *mouse;
 USBHIDConsumerControl *consumer;
 USBHIDSystemControl *sysctl;
 USBHID *hidBase;
+
+// 화면 위치 마우스 (절대 좌표). 일반 마우스와 따로 쓰도록 보고서 번호 7
+// 카메라로 TV를 보며 누른 곳을 바로 클릭할 때 씀. 윈도우·맥·안드로이드·구글 TV는 받음
+static const uint8_t ABS_ID = 7;
+static const uint8_t ABS_DESC[] = {
+  0x05, 0x01, 0x09, 0x02, 0xA1, 0x01, 0x85, ABS_ID,
+  0x09, 0x01, 0xA1, 0x00,
+  0x05, 0x09, 0x19, 0x01, 0x29, 0x03, 0x15, 0x00, 0x25, 0x01, 0x95, 0x03, 0x75, 0x01, 0x81, 0x02,
+  0x95, 0x01, 0x75, 0x05, 0x81, 0x03,
+  0x05, 0x01, 0x09, 0x30, 0x09, 0x31, 0x16, 0x00, 0x00, 0x26, 0xFF, 0x7F,
+  0x36, 0x00, 0x00, 0x46, 0xFF, 0x7F, 0x75, 0x10, 0x95, 0x02, 0x81, 0x02,
+  0xC0, 0xC0,
+};
+class AbsPointer : public USBHIDDevice {
+  USBHID hid;
+public:
+  AbsPointer() { static bool added = false; if (!added) { added = true; hid.addDevice(this, sizeof(ABS_DESC)); } }
+  void begin() { hid.begin(); }
+  uint16_t _onGetDescriptor(uint8_t *dst) override { memcpy(dst, ABS_DESC, sizeof(ABS_DESC)); return sizeof(ABS_DESC); }
+  bool send(uint8_t buttons, uint16_t x, uint16_t y) {
+    x = x > 32767 ? 32767 : x; y = y > 32767 ? 32767 : y;
+    uint8_t r[5] = {buttons, (uint8_t)(x & 0xFF), (uint8_t)(x >> 8), (uint8_t)(y & 0xFF), (uint8_t)(y >> 8)};
+    return hid.SendReport(ABS_ID, r, sizeof(r));
+  }
+};
+AbsPointer *absPtr;
 bool usbCompat = false;
 Preferences prefs;
 
@@ -406,7 +434,7 @@ void handle(const Msg &m) {
 
   switch (c) {
     case C_KEY_TAP: case C_KEY_DOWN: case C_TEXT: case C_MOUSE_MOVE: case C_MOUSE_CLICK:
-    case C_MOUSE_DOWN: case C_CC_TAP: case C_CC_DOWN: case C_SYSTEM:
+    case C_MOUSE_DOWN: case C_CC_TAP: case C_CC_DOWN: case C_SYSTEM: case C_ABS: case C_ABS_CLICK:
       usbWake(); break;
   }
 
@@ -431,6 +459,18 @@ void handle(const Msg &m) {
       if (pn >= 2) { uint16_t u = (uint16_t)p[0] | ((uint16_t)p[1] << 8); consumer->press(u); btCcSend(u); }
       break;
     case C_CC_UP: consumer->release(); btCcSend(0); break;
+    case C_ABS:
+      if (pn >= 4) absPtr->send(pn >= 5 ? p[4] : 0, (uint16_t)p[0] | ((uint16_t)p[1] << 8), (uint16_t)p[2] | ((uint16_t)p[3] << 8));
+      break;
+    case C_ABS_CLICK:
+      if (pn >= 4) {
+        uint16_t x = (uint16_t)p[0] | ((uint16_t)p[1] << 8), y = (uint16_t)p[2] | ((uint16_t)p[3] << 8);
+        uint8_t b = pn >= 5 && p[4] ? p[4] : 1;
+        absPtr->send(0, x, y); delay(25);      // 먼저 그 위치로
+        absPtr->send(b, x, y); delay(40);      // 누르고
+        absPtr->send(0, x, y);                 // 떼기
+      }
+      break;
     case C_SYSTEM:
       if (pn >= 1) { sysctl->press(p[0]); delay(30); sysctl->release(); }
       break;
@@ -579,6 +619,7 @@ void setup() {
   mouse = new USBHIDMouse();
   consumer = new USBHIDConsumerControl();
   sysctl = new USBHIDSystemControl();
+  absPtr = new AbsPointer();   // 모든 HID 장치는 begin 전에 등록해야 설명서(descriptor)에 들어감
   USB.productName("HW Remote");
   USB.manufacturerName("CHAEUM");
   USB.usbAttributes(TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP);   // 버스 전원 + 절전 중 깨우기 지원 (기본값은 '자체 전원'이라 틀림)
@@ -587,6 +628,7 @@ void setup() {
   mouse->begin();
   consumer->begin();
   sysctl->begin();
+  absPtr->begin();
   USB.begin();
 
   // BLE
