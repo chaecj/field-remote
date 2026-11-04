@@ -13,6 +13,7 @@ import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.Window;
 import android.view.WindowManager;
+import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -23,7 +24,7 @@ import java.util.List;
 
 /** 화면: 리모컨 HTML을 띄우고, 블루투스 권한과 볼륨 버튼을 처리 */
 public class MainActivity extends Activity {
-    private static final int REQ_PERMS = 10, REQ_ENABLE_BT = 11, REQ_DISCOVERABLE = 12, REQ_SHARE_PICK = 13;
+    private static final int REQ_PERMS = 10, REQ_ENABLE_BT = 11, REQ_DISCOVERABLE = 12, REQ_SHARE_PICK = 13, REQ_CAMERA = 14;
 
     private WebView web;
     private final List<Runnable> afterBluetooth = new ArrayList<>();
@@ -31,6 +32,7 @@ public class MainActivity extends Activity {
     ScreenShare share;
     static MainActivity current;   // 앱 완전히 끄기에서 화면을 닫을 때 씀
     private boolean userKeepOn = false, shareKeepOn = false;
+    private PermissionRequest pendingCam;   // 화면이 카메라를 달라고 했는데 권한을 묻는 중
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override protected void onCreate(Bundle state) {
@@ -51,7 +53,22 @@ public class MainActivity extends Activity {
         s.setAllowFileAccess(true);
         s.setTextZoom(100);
         s.setMediaPlaybackRequiresUserGesture(false);
-        web.setWebChromeClient(new WebChromeClient());
+        web.setWebChromeClient(new WebChromeClient() {
+            // 터치패드 카메라 모드: 화면(getUserMedia)이 카메라를 쓰게 허락. 안드로이드 권한이 없으면 먼저 물어봄
+            @Override public void onPermissionRequest(PermissionRequest req) {
+                runOnUiThread(() -> {
+                    boolean cam = false;
+                    for (String r : req.getResources()) if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(r)) cam = true;
+                    if (!cam) { req.deny(); return; }
+                    if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                        req.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+                    } else {
+                        pendingCam = req;
+                        requestPermissions(new String[]{Manifest.permission.CAMERA}, REQ_CAMERA);
+                    }
+                });
+            }
+        });
         web.setWebViewClient(new WebViewClient());
         web.addJavascriptInterface(new Bridge(this), "Native");
         setContentView(web);
@@ -139,6 +156,14 @@ public class MainActivity extends Activity {
 
     @Override public void onRequestPermissionsResult(int code, String[] perms, int[] results) {
         super.onRequestPermissionsResult(code, perms, results);
+        if (code == REQ_CAMERA) {
+            PermissionRequest r = pendingCam; pendingCam = null;
+            if (r != null) {
+                if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) r.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+                else r.deny();
+            }
+            return;
+        }
         if (code != REQ_PERMS) return;
         if (btPermsOk()) askEnable();
         else { asking = false; afterBluetooth.clear(); Hub.emit("onPerm", false); }

@@ -160,6 +160,22 @@ details.more .grid { margin-top: 12px; }
   background: linear-gradient(180deg, var(--key-hi), var(--key)); font-weight: 800; font-size: 17px; color: var(--accent-2);
 }
 .hanpill.ko { color: var(--accent-ink); background: var(--grad); border-color: transparent; }
+/* 카메라로 보며 터치 */
+.cambox { display: grid; gap: 10px; }
+.camstage { --ar: 1.333; position: relative; width: min(100%, calc(52dvh * var(--ar))); aspect-ratio: var(--ar); margin: 0 auto;
+  background: #000; border-radius: 16px; overflow: hidden; touch-action: none; border: 1px solid var(--line); user-select: none; -webkit-user-select: none; }
+.caminner { position: absolute; inset: 0; transform-origin: 0 0; transition: transform 0.2s; }
+.caminner video, .caminner canvas, .caminner svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.caminner video[hidden], .caminner canvas[hidden] { display: none; }
+#camOverlay .q { fill: color-mix(in srgb, var(--accent) 14%, transparent); stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; }
+#camOverlay .h { fill: color-mix(in srgb, var(--accent) 45%, transparent); stroke: var(--fg); stroke-width: 2; vector-effect: non-scaling-stroke; cursor: grab; }
+#camOverlay .rp { fill: none; stroke: var(--ok); stroke-width: 3; vector-effect: non-scaling-stroke; pointer-events: none; animation: camrp 0.7s ease-out forwards; }
+@keyframes camrp { from { opacity: 1; } to { opacity: 0; } }
+.cammsg { margin: 0; font-size: 13.5px; color: var(--fg); }
+.cammsg small { display: block; color: var(--muted); font-size: 12px; }
+.cambtns { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; }
+.cambtns .key[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent); color: var(--fg); }
+.cambtns .key { min-height: 50px; }
 .padbox { border: 1px solid var(--line); border-radius: 20px; overflow: hidden; background: var(--panel); }
 .touchpad {
   height: calc(100vh - 380px); min-height: 220px; max-height: 520px;
@@ -311,8 +327,9 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
   #v-remote .log { grid-column: 1 / -1; }
 
   /* 터치패드: 왼쪽 = 글자 입력, 오른쪽 = 패드 */
-  .pad-view > .typebar { grid-column: 1; }
-  .pad-view > .padbox { grid-row: 1 / span 3; }
+  .pad-view > .typebar, .pad-view > #padMode { grid-column: 1; }
+  .pad-view > .padbox, .pad-view > .cambox { grid-row: 1 / span 3; }
+  .camstage { width: min(100%, calc(70dvh * var(--ar))); }
   .pad-view .touchpad { height: calc(100vh - 260px); max-height: none; min-height: 200px; }
 
   /* 클리커: 왼쪽 = 설정·보조 버튼, 오른쪽 = 이전/다음 */
@@ -426,6 +443,10 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
 
   <!-- 터치패드 -->
   <section class="view pad-view" id="v-pad" hidden>
+    <div class="seg two" id="padMode">
+      <button data-pm="pad" aria-pressed="true">터치패드</button>
+      <button data-pm="cam" aria-pressed="false">카메라로 보며 터치</button>
+    </div>
     <!-- 글자 입력: 위쪽에 두어 휴대폰 키보드가 올라와도 가리지 않음 -->
     <div class="typebar">
       <input type="text" id="textIn" placeholder="여기에 치면 TV에 바로 입력" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="TV에 입력할 글자">
@@ -434,7 +455,7 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
     </div>
 
     <!-- 터치패드: 노트북 트랙패드처럼 아래에 클릭 버튼이 붙어 있음 -->
-    <div class="padbox">
+    <div class="padbox" id="padBox">
       <div class="touchpad" id="touchpad">
         <span class="padhint">끌기 = 커서 · 톡 = 클릭 · 두 손가락 = 스크롤</span>
         <div class="sens" role="group" aria-label="커서 속도">
@@ -446,6 +467,27 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
         <button id="dragBtn" aria-pressed="false">끌기 고정</button>
         <button id="rclick">오른쪽 클릭</button>
       </div>
+    </div>
+
+    <!-- 카메라 모드: TV를 찍고 사진 속 TV를 누르면 그 자리를 클릭 -->
+    <div class="cambox" id="camBox" hidden>
+      <div class="camstage" id="camStage">
+        <div class="caminner" id="camInner">
+          <video id="camVideo" playsinline muted autoplay></video>
+          <canvas id="camCanvas" hidden></canvas>
+          <svg id="camOverlay" style="display:none"></svg>
+        </div>
+      </div>
+      <p class="cammsg" id="camMsg">카메라를 켜는 중…</p>
+      <div class="cambtns">
+        <button class="key accent" id="camShot">찍기</button>
+        <button class="key" id="camEdit" aria-pressed="false">모서리</button>
+        <button class="key" id="camZoom">확대 1×</button>
+      </div>
+      <p class="hint">톡 = 클릭 · 길게 = 오른쪽 클릭 · 검색창을 누른 뒤 위 입력칸에 치면 돼요</p>
+      <div class="volrow"><span class="grow">누른 뒤 자동으로 다시 찍기<small>결과를 바로 확인 (휴대폰을 크게 움직이지 마세요)</small></span><button class="toggle" id="camAuto" aria-pressed="true">켬</button></div>
+      <div class="volrow"><span class="grow">TV가 누른 곳으로 안 가면<small>커서를 옮겨서 클릭 (대략 맞춤, 일부 스마트 TV용)</small></span><button class="toggle" id="camRel" aria-pressed="false">끔</button></div>
+      <p class="hint" id="camFwNote" hidden>동글 펌웨어를 1.6.0 이상으로 올리면 누른 곳을 정확히 클릭해요. 지금은 커서를 옮겨서 대략 맞춰요.</p>
     </div>
   </section>
 
@@ -535,7 +577,7 @@ const CMD  = '7e1a0002-5c2b-4f3a-9e7d-3c1b8a9f0a11';
 const INFO = '7e1a0003-5c2b-4f3a-9e7d-3c1b8a9f0a11';
 const OP = { KEY_TAP:0x01, KEY_ALLUP:0x04, TEXT:0x05, MOVE:0x06, CLICK:0x07, MDOWN:0x08, MUP:0x09,
              CC_TAP:0x0A, SYS:0x0D, IR:0x20, IR_BEGIN:0x30, IR_DATA:0x31, IR_END:0x32, IDENTIFY:0x40, SET_NAME:0x41, BT_FORGET:0x42, USB_COMPAT:0x43,
-             OTA_BEGIN:0x50, OTA_DATA:0x51, OTA_END:0x52, OTA_ABORT:0x53, OTA_DATA2:0x54 };
+             OTA_BEGIN:0x50, OTA_DATA:0x51, OTA_END:0x52, OTA_ABORT:0x53, OTA_DATA2:0x54, ABS:0x0E, ABS_CLICK:0x0F };
 
 /* ---------------- IR 인코더 ---------------- */
 function pdm(hdr, bytes, bitMark, one, zero) {
@@ -952,6 +994,7 @@ const ui = {
     const on = [...dongles.values()].filter(d => d.state === 'on').length;
     $('#status').textContent = dongles.size ? `${on}/${dongles.size}대 연결` + (groupMode ? ` · ${targets().length}대 동시` : '') : '동글 없음';
     this.renderSettings(); pushVolumeConfig();
+    if (!$('#camBox').hidden) syncCam();   // 동글이 바뀌면 카메라 모드 안내도 갱신
   },
   log(d, act, m) {
     $('#log').textContent = `${this.name(d)} ← ${ACTIONS[act] ? ACTIONS[act].label : act}  (${describe(m)})`;
@@ -1939,6 +1982,249 @@ function bindShare() {
   share.render();
 }
 
+/* ---------------- 터치패드: 카메라로 TV를 보며 터치 ---------------- */
+// 휴대폰 카메라로 TV를 찍고, 사진 속 TV 화면에서 누른 곳을 TV에서 클릭함 (블루투스 → 동글).
+// 사진 위에서 누르므로 손이 흔들려도 정확. TV 네 모서리는 자동으로 찾고, 못 찾으면 직접 끌어 맞춤.
+var cam = {
+  stream: null, frame: null,          // frame = 마지막으로 찍은 사진 (canvas)
+  quad: null,                         // 사진 속 TV 네 모서리 [[x,y]*4] 왼위·오위·오아래·왼아래 (사진 픽셀)
+  H: null,                            // 사진 좌표 → TV 화면(0~1) 변환
+  zoom: 1, busy: false, refreshT: 0, edit: false,   // edit = 모서리 맞추는 중
+  get s() { const o = store.cam || (store.cam = {}); if (!('auto' in o)) o.auto = true; return o; },
+
+  async start() {
+    if (this.stream) return true;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { this.msg('이 화면에서는 카메라를 쓸 수 없어요.'); return false; }
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } });
+    } catch (e) {
+      this.msg('카메라를 켜지 못했어요. 카메라 권한을 허용해 주세요.'); return false;
+    }
+    const v = $('#camVideo'); v.srcObject = this.stream;
+    v.onloadedmetadata = () => this.fit(v.videoWidth, v.videoHeight);
+    try { await v.play(); } catch (e) {}
+    this.fit(v.videoWidth, v.videoHeight);
+    this.live(true);
+    this.msg('TV가 화면에 들어오게 비추고 <b>찍기</b>를 누르세요.');
+    return true;
+  },
+  stop() {
+    if (this.stream) { this.stream.getTracks().forEach(t => t.stop()); this.stream = null; }
+    clearTimeout(this.refreshT);
+  },
+  // 화면 칸을 영상 비율에 딱 맞춤 (누른 위치 계산이 어긋나지 않게)
+  fit(w, h) { if (w && h) $('#camStage').style.setProperty('--ar', (w / h).toFixed(4)); },
+  msg(h) { const m = $('#camMsg'); if (m) m.innerHTML = h; },
+  live(on) {
+    $('#camVideo').hidden = !on; $('#camCanvas').hidden = on; $('#camOverlay').style.display = on ? 'none' : '';
+    $('#camShot').textContent = on ? '찍기' : '다시 찍기';
+  },
+
+  // 지금 카메라 화면을 사진으로 고정
+  capture(keepQuad) {
+    const v = $('#camVideo');
+    if (!this.stream || !v.videoWidth) { this.msg('카메라가 아직 준비되지 않았어요.'); return false; }
+    const c = $('#camCanvas'); c.width = v.videoWidth; c.height = v.videoHeight; this.fit(c.width, c.height);
+    c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+    this.frame = c;
+    const found = this.detect(c);
+    if (found) { this.quad = found; this.setEdit(false); this.msg('TV를 찾았어요. 사진 속 TV 화면을 누르면 TV에서 클릭해요. <small>테두리가 어긋나면 ‘모서리’를 눌러 맞추세요</small>'); }
+    else if (keepQuad && this.quad) { /* 손을 거의 안 움직였다고 보고 이전 모서리 그대로 */ }
+    else {
+      const w = c.width, h = c.height;
+      this.quad = [[w * 0.2, h * 0.22], [w * 0.8, h * 0.22], [w * 0.8, h * 0.78], [w * 0.2, h * 0.78]];
+      this.setEdit(true);
+    }
+    this.live(false); this.solve(); this.draw();
+    return true;
+  },
+
+  // TV 화면 자동 찾기
+  // 1) TV의 검은 테두리 안쪽 = 화면 (화면 내용이 어둡거나 벽과 색이 비슷해도 잘 찾음)
+  // 2) 테두리가 안 보이면 밝은 큰 네모(켜진 화면)
+  // 둘 다 실패하면 null → 사용자가 모서리를 끌어 맞춤
+  detect(c) {
+    const W = 240, Hh = Math.max(1, Math.round(c.height * W / c.width)), n = W * Hh;
+    const t = document.createElement('canvas'); t.width = W; t.height = Hh;
+    const g = t.getContext('2d', { willReadFrequently: true }); g.drawImage(c, 0, 0, W, Hh);
+    const px = g.getImageData(0, 0, W, Hh).data, lum = new Uint8Array(n), hist = new Array(256).fill(0);
+    for (let i = 0; i < n; i++) { const L = (px[i * 4] * 77 + px[i * 4 + 1] * 150 + px[i * 4 + 2] * 29) >> 8; lum[i] = L; hist[L]++; }
+    const nbrs = (k) => { const x = k % W, y = (k / W) | 0; return [x > 0 ? k - 1 : -1, x < W - 1 ? k + 1 : -1, y > 0 ? k - W : -1, y < Hh - 1 ? k + W : -1]; };
+    // 조건(ok)을 만족하는 칸들 중 가장 큰 덩어리
+    const biggest = (ok) => {
+      const seen = new Uint8Array(n), st = []; let best = null;
+      for (let i = 0; i < n; i++) {
+        if (seen[i] || !ok(i)) continue;
+        const list = []; st.push(i); seen[i] = 1;
+        while (st.length) { const k = st.pop(); list.push(k); for (const q of nbrs(k)) if (q >= 0 && !seen[q] && ok(q)) { seen[q] = 1; st.push(q); } }
+        if (!best || list.length > best.length) best = list;
+      }
+      return best;
+    };
+    // 덩어리 → 네 귀퉁이 (왼위·오위·오아래·왼아래), 네모 모양인지 확인
+    const toQuad = (members, minFill) => {
+      if (!members || members.length < n * 0.03) return null;
+      let tl, tr, br, bl, a = 1e9, b = -1e9, cm = -1e9, d = 1e9;
+      for (const k of members) { const x = k % W, y = (k / W) | 0;
+        if (x + y < a) { a = x + y; tl = [x, y]; } if (x - y > b) { b = x - y; tr = [x, y]; }
+        if (x + y > cm) { cm = x + y; br = [x, y]; } if (x - y < d) { d = x - y; bl = [x, y]; } }
+      const q = [tl, tr, br, bl];
+      const area = Math.abs(q.reduce((s, p, i) => { const r = q[(i + 1) % 4]; return s + p[0] * r[1] - r[0] * p[1]; }, 0)) / 2;
+      if (area < n * 0.03 || members.length / area < minFill) return null;
+      if (q.every(([x, y]) => x <= 1 || y <= 1 || x >= W - 2 || y >= Hh - 2)) return null;   // 사진 전체 = TV 아님
+      const k = c.width / W;
+      return q.map(([x, y]) => [x * k + k / 2, y * k + k / 2]);
+    };
+    // 1) 검은 테두리: 아주 어두운 칸을 벽으로 보고, 사진 가장자리에서 닿지 않는 안쪽 영역
+    const dark = Math.min(48, Math.max(18, lum.reduce((s, v) => s + v, 0) / n * 0.35));
+    const out = new Uint8Array(n), st = [];
+    for (let x = 0; x < W; x++) for (const y of [0, Hh - 1]) { const k = y * W + x; if (lum[k] > dark && !out[k]) { out[k] = 1; st.push(k); } }
+    for (let y = 0; y < Hh; y++) for (const x of [0, W - 1]) { const k = y * W + x; if (lum[k] > dark && !out[k]) { out[k] = 1; st.push(k); } }
+    while (st.length) { const k = st.pop(); for (const q of nbrs(k)) if (q >= 0 && !out[q] && lum[q] > dark) { out[q] = 1; st.push(q); } }
+    const inner = toQuad(biggest((i) => !out[i] && lum[i] > dark), 0.8);
+    if (inner) return inner;
+    // 2) 밝은 큰 네모 (오츠 방식으로 밝음/어두움 경계)
+    let sum = 0; for (let i = 0; i < 256; i++) sum += i * hist[i];
+    let sB = 0, wB = 0, best = 0, th = 128;
+    for (let i = 0; i < 256; i++) { wB += hist[i]; if (!wB) continue; const wF = n - wB; if (!wF) break; sB += i * hist[i]; const mB = sB / wB, mF = (sum - sB) / wF, v = wB * wF * (mB - mF) * (mB - mF); if (v > best) { best = v; th = i; } }
+    return toQuad(biggest((i) => lum[i] > th), 0.6);
+  },
+
+  // 네 모서리 → 0~1 정사각형 (투시 변환)
+  solve() {
+    const s = this.quad, d = [[0, 0], [1, 0], [1, 1], [0, 1]], A = [], B = [];
+    for (let i = 0; i < 4; i++) { const [x, y] = s[i], [u, v] = d[i];
+      A.push([x, y, 1, 0, 0, 0, -u * x, -u * y]); B.push(u);
+      A.push([0, 0, 0, x, y, 1, -v * x, -v * y]); B.push(v); }
+    for (let c = 0; c < 8; c++) {   // 가우스 소거
+      let p = c; for (let r = c + 1; r < 8; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r;
+      [A[c], A[p]] = [A[p], A[c]]; [B[c], B[p]] = [B[p], B[c]];
+      if (Math.abs(A[c][c]) < 1e-12) { this.H = null; return; }
+      for (let r = 0; r < 8; r++) if (r !== c) { const f = A[r][c] / A[c][c]; for (let k = c; k < 8; k++) A[r][k] -= f * A[c][k]; B[r] -= f * B[c]; }
+    }
+    this.H = B.map((v, i) => v / A[i][i]);
+  },
+  toTv(x, y) {
+    const h = this.H; if (!h) return null;
+    const w = h[6] * x + h[7] * y + 1;
+    return [(h[0] * x + h[1] * y + h[2]) / w, (h[3] * x + h[4] * y + h[5]) / w];
+  },
+
+  setEdit(on) {
+    this.edit = on; $('#camEdit').setAttribute('aria-pressed', on); $('#camEdit').textContent = on ? '완료' : '모서리';
+    if (on) this.msg('<b>TV 화면 네 귀퉁이</b>를 하나씩 눌러 맞추세요. 누른 곳에서 가장 가까운 동그라미가 옮겨 와요. 다 되면 <b>완료</b>.');
+    else if (this.frame) this.msg('사진 속 TV 화면을 누르면 TV에서 클릭해요.');
+    this.draw();
+  },
+  // 사진 위 표시: TV 테두리 (모서리 맞추는 중에는 동그라미도)
+  draw() {
+    const svg = $('#camOverlay'), c = this.frame; if (!c || !this.quad) return;
+    svg.setAttribute('viewBox', `0 0 ${c.width} ${c.height}`);
+    const r = Math.max(c.width, c.height) / 45;
+    svg.innerHTML = `<polygon points="${this.quad.map(p => p.join(',')).join(' ')}" class="q"/>` +
+      (this.edit ? this.quad.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="${r}" class="h"/>`).join('') : '');
+  },
+  // 화면 터치 좌표 → 사진 픽셀 좌표
+  toPhoto(e) {
+    const r = $('#camCanvas').getBoundingClientRect(), c = this.frame;
+    return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height];
+  },
+  setZoom(z) {
+    this.zoom = z; $('#camZoom').textContent = `확대 ${z}×`;
+    const stage = $('#camStage'), inner = $('#camInner');
+    if (z === 1 || !this.quad || !this.frame) { inner.style.transform = ''; return; }
+    // TV 가운데가 화면 가운데 오도록 확대
+    const cx = this.quad.reduce((s, p) => s + p[0], 0) / 4 / this.frame.width, cy = this.quad.reduce((s, p) => s + p[1], 0) / 4 / this.frame.height;
+    const W = stage.clientWidth, H = stage.clientHeight;
+    const tx = clamp(W / 2 - cx * W * z, W - W * z, 0), ty = clamp(H / 2 - cy * H * z, H - H * z, 0);
+    inner.style.transform = `translate(${tx}px, ${ty}px) scale(${z})`;
+  },
+
+  // 누른 곳 클릭 (button 1 = 왼쪽, 2 = 오른쪽)
+  async tap(x, y, button) {
+    const uv = this.toTv(x, y);
+    if (!uv) return;
+    const [u, v] = uv;
+    if (u < -0.02 || u > 1.02 || v < -0.02 || v > 1.02) { ui.toast('TV 화면 밖을 눌렀어요.'); return; }
+    this.ripple(x, y);
+    const ux = clamp(u, 0, 1), vy = clamp(v, 0, 1);
+    const ts = targets();
+    if (!ts.length) { ui.toast('연결된 TV가 없어요.'); return; }
+    if (navigator.vibrate) navigator.vibrate(10);
+    for (const d of ts) {
+      const abs = !d.phone && !cfgOf(d.id).camRel && d.fw && !fw.newer('1.6.0', d.fw);
+      if (abs) {
+        const X = Math.round(ux * 32767), Y = Math.round(vy * 32767);
+        d.write([OP.ABS_CLICK, X & 255, X >> 8, Y & 255, Y >> 8, button], true).catch(() => {});
+      } else relClick(d, ux, vy, button);
+    }
+    // 잠시 뒤 다시 찍어 결과를 보여 줌
+    if (this.s.auto) { clearTimeout(this.refreshT); this.refreshT = setTimeout(() => { if (!$('#camCanvas').hidden) this.capture(true); }, 1100); }
+  },
+  ripple(x, y) {
+    const svg = $('#camOverlay'), c = this.frame, r = Math.max(c.width, c.height) / 30;
+    const el = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    el.setAttribute('cx', x); el.setAttribute('cy', y); el.setAttribute('r', r); el.setAttribute('class', 'rp');
+    svg.appendChild(el); setTimeout(() => el.remove(), 700);
+  },
+};
+// 화면 위치 마우스가 없는 동글(1.6.0 전)이나 그걸 안 받는 TV: 커서를 왼쪽 위 끝까지 보낸 뒤 그만큼 옮겨서 클릭 (대략)
+async function relClick(d, u, v, button) {
+  const c = cfgOf(d.id), W = c.camW || 1920, H = c.camH || 1080;
+  const send = (x, y) => d.write([OP.MOVE, x & 255, y & 255, 0, 0]).catch(() => {});
+  for (let i = 0; i < 30; i++) { send(-127, -127); await sleep(4); }
+  let dx = Math.round(u * W), dy = Math.round(v * H);
+  while (dx > 0 || dy > 0) { const sx = Math.min(12, dx), sy = Math.min(12, dy); send(sx, sy); dx -= sx; dy -= sy; await sleep(6); }
+  await sleep(40);
+  d.write([OP.CLICK, button], true).catch(() => {});
+}
+function bindCamera() {
+  const stage = $('#camStage');
+  let drag = -1, downAt = 0, down = null, longT = 0, longDone = false;
+  stage.addEventListener('pointerdown', (e) => {
+    if ($('#camCanvas').hidden || !cam.frame) return;
+    if (cam.edit) {   // 모서리 맞추기: 가장 가까운 모서리를 누른 곳으로
+      const p = cam.toPhoto(e);
+      drag = cam.quad.reduce((bi, q, i) => Math.hypot(q[0] - p[0], q[1] - p[1]) < Math.hypot(cam.quad[bi][0] - p[0], cam.quad[bi][1] - p[1]) ? i : bi, 0);
+      cam.quad[drag] = p; cam.solve(); cam.draw();
+      try { stage.setPointerCapture(e.pointerId); } catch (_) {} e.preventDefault(); return;
+    }
+    down = cam.toPhoto(e); downAt = Date.now(); longDone = false;
+    clearTimeout(longT); longT = setTimeout(() => { longDone = true; cam.tap(down[0], down[1], 2); }, 550);   // 길게 = 오른쪽 클릭
+  });
+  stage.addEventListener('pointermove', (e) => {
+    if (drag >= 0) { cam.quad[drag] = cam.toPhoto(e); cam.solve(); cam.draw(); return; }
+    if (down) { const p = cam.toPhoto(e); if (Math.hypot(p[0] - down[0], p[1] - down[1]) > cam.frame.width / 40) { clearTimeout(longT); down = null; } }
+  });
+  const up = () => {
+    if (drag >= 0) { drag = -1; return; }
+    clearTimeout(longT);
+    if (down && !longDone) cam.tap(down[0], down[1], 1);
+    down = null;
+  };
+  stage.addEventListener('pointerup', up); stage.addEventListener('pointercancel', () => { drag = -1; down = null; clearTimeout(longT); });
+  $('#camShot').onclick = async () => { if (!cam.stream && !(await cam.start())) return; if ($('#camCanvas').hidden) cam.capture(false); else { cam.live(true); cam.msg('TV가 화면에 들어오게 비추고 <b>찍기</b>를 누르세요.'); } cam.setZoom(cam.zoom); };
+  $('#camZoom').onclick = () => cam.setZoom(cam.zoom >= 3 ? 1 : cam.zoom + 1);
+  $('#camEdit').onclick = () => { if (!cam.frame || $('#camCanvas').hidden) { ui.toast('먼저 찍기를 눌러 주세요.'); return; } cam.setEdit(!cam.edit); };
+  $('#camAuto').onclick = () => { cam.s.auto = !cam.s.auto; save(); syncCam(); };
+  $('#camRel').onclick = () => { const d = dongles.get(current); if (!d) return; const c = cfgOf(d.id); c.camRel = !c.camRel; save(); syncCam(); ui.toast(c.camRel ? '커서를 옮겨서 클릭하는 방식으로 바꿨어요 (대략 맞춤)' : '누른 위치로 바로 클릭하는 방식으로 바꿨어요'); };
+  $$('#padMode button').forEach(b => b.onclick = () => { store.padMode = b.dataset.pm; save(); syncPadMode(); });
+  syncPadMode();
+}
+function syncCam() {
+  $('#camAuto').setAttribute('aria-pressed', !!cam.s.auto); $('#camAuto').textContent = cam.s.auto ? '켬' : '끔';
+  const d = dongles.get(current), c = d ? cfgOf(d.id) : {};
+  $('#camRel').setAttribute('aria-pressed', !!c.camRel); $('#camRel').textContent = c.camRel ? '켬' : '끔';
+  const old = d && !d.phone && (!d.fw || fw.newer('1.6.0', d.fw));
+  $('#camFwNote').hidden = !old;
+}
+function syncPadMode() {
+  const camMode = store.padMode === 'cam';
+  $$('#padMode button').forEach(b => b.setAttribute('aria-pressed', (b.dataset.pm === 'cam') === camMode));
+  $('#padBox').hidden = camMode; $('#camBox').hidden = !camMode;
+  if (camMode && !$('#v-pad').hidden) { cam.start(); syncCam(); } else cam.stop();
+}
+
 /* ---------------- 클리커 ---------------- */
 // 키: [HID 키코드, 수식키]  수식키 비트: 1=Ctrl 2=Shift 4=Alt 8=Cmd/Win
 const K = { right: 0x4F, left: 0x50, esc: 0x29, enter: 0x28, f5: 0x3E, f11: 0x44, b: 0x05, w: 0x1A, l: 0x0F, p: 0x13, home: 0x4A, end: 0x4D };
@@ -2025,6 +2311,8 @@ function switchTab(name) {
   ['remote', 'pad', 'clk', 'share', 'set'].forEach(t => { $('#v-' + t).hidden = t !== name; });
   try { sessionStorage.setItem('fr.tab', name); } catch (e) {}
   if (name === 'share') share.render();
+  // 카메라는 터치패드 탭의 카메라 모드일 때만 켬 (배터리·발열)
+  if (typeof cam !== 'undefined') { if (name === 'pad' && store.padMode === 'cam') { cam.start(); syncCam(); } else cam.stop(); }
 }
 
 let wakeLock = null;
@@ -2064,7 +2352,7 @@ function init() {
     setTimeout(() => upd.check(false), 1500);   // 켤 때마다 조용히 확인
   }
   $('#wakeBtn').onclick = (e) => toggleWake(e.currentTarget);
-  bindKeys(); bindTouchpad(); bindShare(); bindClicker();
+  bindKeys(); bindTouchpad(); bindCamera(); bindShare(); bindClicker();
   document.addEventListener('visibilitychange', () => {
     if (!NATIVE && document.visibilityState === 'visible' && $('#wakeBtn').getAttribute('aria-pressed') === 'true' && !wakeLock) toggleWake($('#wakeBtn'));
   });

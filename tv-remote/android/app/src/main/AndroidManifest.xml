@@ -18,6 +18,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- 터치패드의 카메라 모드: TV를 비추고 누른 곳을 클릭 -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
     <application
