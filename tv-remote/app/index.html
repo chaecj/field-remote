@@ -153,9 +153,18 @@ details.more .grid { margin-top: 12px; }
 /* 터치패드 */
 .pad-view { gap: 12px; }
 .typebar { display: flex; gap: 8px; align-items: stretch; }
-.fkeys { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.fkwrap > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+  color: var(--muted); font: 600 12.5px var(--font-mono); user-select: none;
+}
+.fkwrap > summary::-webkit-details-marker { display: none; }
+.fkwrap > summary::after { content: "펼치기 ▾"; font-family: var(--font-ui); font-weight: 500; font-size: 12px; }
+.fkwrap[open] > summary::after { content: "접기 ▴"; }
+.fkwrap[open] > summary { color: var(--fg); border-color: var(--accent); }
+.fkeys { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 6px; }
 .fkeys .key { min-height: 38px; font-size: 12.5px; border-radius: 10px; font-family: var(--font-mono); }
-body.cam-on .fkeys { display: none; }
+body.cam-on .fkwrap { display: none; }
 .typebar input { flex: 1; min-width: 0; height: 48px; font-size: 16px; }
 .typebar .btn { height: 48px; padding-inline: 16px; }
 .hanpill {
@@ -342,7 +351,7 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
   #v-remote .log { grid-column: 1 / -1; }
 
   /* 터치패드: 왼쪽 = 글자 입력, 오른쪽 = 패드 */
-  .pad-view > .typebar, .pad-view > #padMode, .pad-view > .fkeys { grid-column: 1; }
+  .pad-view > .typebar, .pad-view > #padMode, .pad-view > .fkwrap { grid-column: 1; }
   .pad-view > .padbox, .pad-view > .cambox { grid-row: 1 / span 3; }
   .cambox { height: calc(100dvh - 150px); }
   /* 태블릿 가로 + 카메라 터치: 왼쪽 큰 사진, 오른쪽 조작 칸 */
@@ -493,20 +502,23 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
       <button class="hanpill" id="hanBtn" title="한글이 영어로(또는 반대로) 나오면 누르세요">A</button>
       <button class="btn primary" id="textSend">엔터</button>
     </div>
-    <div class="fkeys" aria-label="F1~F12">
-      <button class="key" data-kb="58">F1</button>
-      <button class="key" data-kb="59">F2</button>
-      <button class="key" data-kb="60">F3</button>
-      <button class="key" data-kb="61">F4</button>
-      <button class="key" data-kb="62">F5</button>
-      <button class="key" data-kb="63">F6</button>
-      <button class="key" data-kb="64">F7</button>
-      <button class="key" data-kb="65">F8</button>
-      <button class="key" data-kb="66">F9</button>
-      <button class="key" data-kb="67">F10</button>
-      <button class="key" data-kb="68">F11</button>
-      <button class="key" data-kb="69">F12</button>
-    </div>
+    <details class="fkwrap" id="fkWrap">
+      <summary>F1 ~ F12</summary>
+  <div class="fkeys" aria-label="F1~F12">
+        <button class="key" data-kb="58">F1</button>
+        <button class="key" data-kb="59">F2</button>
+        <button class="key" data-kb="60">F3</button>
+        <button class="key" data-kb="61">F4</button>
+        <button class="key" data-kb="62">F5</button>
+        <button class="key" data-kb="63">F6</button>
+        <button class="key" data-kb="64">F7</button>
+        <button class="key" data-kb="65">F8</button>
+        <button class="key" data-kb="66">F9</button>
+        <button class="key" data-kb="67">F10</button>
+        <button class="key" data-kb="68">F11</button>
+        <button class="key" data-kb="69">F12</button>
+      </div>
+    </details>
 
     <!-- 터치패드: 노트북 트랙패드처럼 아래에 클릭 버튼이 붙어 있음 -->
     <div class="padbox" id="padBox">
