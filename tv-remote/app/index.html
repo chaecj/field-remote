@@ -1665,7 +1665,8 @@ function bindTouchpad() {
       targets().forEach(d => d.queueMove(dx * s * acc, dy * s * acc, 0));
     } else if (pts.size === 2) {
       const ys = [...pts.values()].reduce((a, q) => a + q.y, 0) / 2;
-      if (lastY !== null) { const w = (lastY - ys) / 18; targets().forEach(d => d.queueMove(0, 0, w)); }
+      // 윈도우 방식: 손가락을 내리면 화면이 아래로 스크롤
+      if (lastY !== null) { const w = (ys - lastY) / 18; targets().forEach(d => d.queueMove(0, 0, w)); }
       lastY = ys;
     }
   });
