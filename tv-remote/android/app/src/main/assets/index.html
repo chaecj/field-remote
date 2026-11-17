@@ -153,6 +153,13 @@ details.more .grid { margin-top: 12px; }
 /* 터치패드 */
 .pad-view { gap: 12px; }
 .typebar { display: flex; gap: 8px; align-items: stretch; }
+.pcfiles { display: grid; gap: 10px; }
+.pcfiles h2 { margin: 0; font-size: 16px; }
+.pcfiles p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.45; }
+.pcfiles .row { display: flex; gap: 8px; align-items: center; }
+.pcfiles .grow { flex: 1; }
+.pcfiles .pcbar { height: 6px; border-radius: 3px; background: var(--key); overflow: hidden; }
+.pcfiles .pcbar i { display: block; height: 100%; width: 0; background: var(--grad); }
 .fkwrap > summary {
   list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
   padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
@@ -371,7 +378,8 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
 
   /* 화면 공유: 왼쪽 = 연결·조작, 오른쪽 = 파일 목록 */
   .share-view > #shareStat, .share-view > .sharenow, .share-view > .sharectl, .share-view > .vidctl, .share-view > #zoomCard, .share-view > .shopts { grid-column: 1; }
-  .share-view > .shlist { grid-row: 1 / span 7; }
+  .share-view > .shlist { grid-row: 1 / span 8; }
+  .share-view > #pcFiles { grid-column: 1; }
 
   /* TV 설정: 카드 2열 */
   #v-set { grid-template-columns: 1fr; }
@@ -571,6 +579,7 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
 
   <!-- 화면 공유: 휴대폰의 사진·영상·PDF를 TV에 (TV에는 파일만 나옴) -->
   <section class="view share-view" id="v-share" hidden>
+    <div class="card pcfiles" id="pcFiles" hidden></div>
     <div class="card sharestat" id="shareStat"></div>
     <div class="sharenow" id="shareNow"></div>
     <div class="sharectl">
@@ -820,7 +829,7 @@ class Dongle {
   }
   onInfo(dv) {
     let j; try { j = JSON.parse(typeof dv === 'string' ? dv : dec.decode(dv)); } catch (e) { return; }
-    this.devName = j.n || this.devName; this.fw = j.v || ''; this.usb = !!j.usb; this.usbSleep = !!j.us; this.bt = j.bt || 0; this.diag = j.d || ''; this.uc = j.uc; this.otaMsg = j.o || '';
+    this.devName = j.n || this.devName; this.fw = j.v || ''; this.usb = !!j.usb; this.usbSleep = !!j.us; this.bt = j.bt || 0; this.diag = j.d || ''; this.uc = j.uc; this.otaMsg = j.o || ''; this.fm = j.fm; this.fs = j.fs; this.fc = j.fc; this.fstate = j.f || '';
     this.mtu = Math.max(23, Math.min(517, j.mtu || 23));
     if (this.btn !== null && j.btn !== this.btn) ui.identifyFromButton(this);
     this.btn = j.btn;
@@ -1053,7 +1062,7 @@ const ui = {
     // 상태
     const on = [...dongles.values()].filter(d => d.state === 'on').length;
     $('#status').textContent = dongles.size ? `${on}/${dongles.size}대 연결` + (groupMode ? ` · ${targets().length}대 동시` : '') : '동글 없음';
-    this.renderSettings(); pushVolumeConfig();
+    this.renderSettings(); pushVolumeConfig(); pcf.render();
     if (!$('#camBox').hidden) syncCam();   // 동글이 바뀌면 카메라 모드 안내도 갱신
   },
   log(d, act, m) {
@@ -1426,6 +1435,63 @@ function pushVolumeConfig() {
     Native.setVolumeConfig(JSON.stringify({ next: mk(1), prev: mk(-1), swap: !!st.swap }));
   } catch (e) {}
 }
+/* ---------------- PC로 파일 보내기 (동글이 PC에 USB 드라이브로 보임) ---------------- */
+const pcf = {
+  job: null,      // { name, sent, total, idx, count }
+  lastErr: '',
+  mb(b) { return (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + 'MB'; },
+  render() {
+    const box = $('#pcFiles'); if (!box) return;
+    const d = dongles.get(current);
+    if (!NATIVE || !d || !d.native || d.state !== 'on') { box.hidden = true; return; }
+    box.hidden = false;
+    let html = '<div class="row"><h2 class="grow">PC로 파일 보내기</h2>';
+    if (d.fs === undefined) {
+      html += '</div><p>동글 펌웨어를 1.7.0 이상으로 올리면 쓸 수 있어요. (TV 설정 → 펌웨어)</p>';
+    } else if (d.fs < 0) {
+      html += '</div><p>저장 공간을 새로 만들어야 해서, PC로 펌웨어를 <b>한 번만</b> 다시 넣어 주세요. 그다음부터는 무선 업데이트로 돼요.</p>';
+    } else if (!d.fm) {
+      html += `<button class="btn sm primary" id="pcOn">켜기</button></div>
+        <p>켜면 동글을 꽂은 PC에 <b>HW REMOTE</b> 드라이브가 생기고, 여기서 보낸 파일이 그 안에 나타나요. TV에 꽂아 쓸 때는 꺼 두세요.</p>`;
+    } else {
+      html += `<button class="btn sm" id="pcOff">끄기</button></div>`;
+      if (this.job) {
+        const j = this.job, pct = j.total ? Math.floor(j.sent * 100 / j.total) : 0;
+        html += `<p><b>${esc(j.name)}</b> 보내는 중 · ${j.idx + 1}/${j.count} · ${pct}%</p>
+          <div class="pcbar"><i style="width:${pct}%"></i></div>
+          <div class="row"><button class="btn sm" id="pcStop">중단</button></div>`;
+      } else {
+        html += `<p>동글 안 파일 <b>${d.fc || 0}개</b> · 남은 공간 <b>${this.mb(d.fs)}</b>. PC 탐색기에서 <b>HW REMOTE</b> 드라이브를 열면 보여요.</p>
+          <div class="row"><button class="btn primary grow" id="pcSend">파일 보내기</button>${d.fc ? '<button class="btn" id="pcClear">모두 비우기</button>' : ''}</div>`;
+      }
+    }
+    box.innerHTML = html;
+    const on = (id, fn) => { const b = $('#' + id); if (b) b.onclick = fn; };
+    on('pcOn', () => d.write([0x44, 1], true).then(() => ui.toast('동글이 다시 시작해요. 곧 다시 연결돼요.')));
+    on('pcOff', () => confirmSheet('PC 파일 드라이브를 끌까요?', '동글 안 파일은 그대로 남아요. 동글이 잠깐 다시 시작해요.', '끄기', () => d.write([0x44, 0], true)));
+    on('pcSend', () => { this.lastErr = ''; Native.pcFilePick(d.id, d.fs); });
+    on('pcClear', () => confirmSheet('동글 안 파일을 모두 비울까요?', 'PC 드라이브에서도 사라져요. 휴대폰의 원본 파일은 그대로예요.', '비우기', () => d.write([0x63], true)));
+    on('pcStop', () => Native.pcFileCancel());
+    if (d.fstate && d.fstate.startsWith('err') && d.fstate !== this.lastErr) {
+      this.lastErr = d.fstate;
+      const why = { 'err:full': '동글 공간이 부족해요. 모두 비우기 후 다시 보내 주세요.', 'err:many': '파일이 너무 많아요 (최대 24개). 모두 비우기 후 다시 보내 주세요.',
+        'err:partition': 'PC로 펌웨어를 한 번 다시 넣어야 해요.' }[d.fstate] || '보내다 문제가 생겼어요. 다시 보내 주세요. (' + d.fstate.slice(4) + ')';
+      ui.toast(why); if (this.job) { Native.pcFileCancel(); this.job = null; }
+    }
+  },
+  onState(state, name, sent, total, idx, count, msg) {
+    if (state === 'start' || state === 'progress') this.job = { name, sent, total, idx, count };
+    else if (state === 'done') this.job = idx + 1 < count ? { name, sent: total, total, idx, count } : null;
+    else if (state === 'all') { this.job = null; ui.toast(count > 1 ? `${count}개 파일을 보냈어요. PC의 HW REMOTE 드라이브를 확인하세요.` : '보냈어요. PC의 HW REMOTE 드라이브를 확인하세요.'); }
+    else if (state === 'cancel') { this.job = null; if (name) ui.toast('보내기를 멈췄어요. 그 파일은 PC에 나타나지 않아요.'); }
+    else if (state === 'error') {
+      this.job = null;
+      ui.toast(msg === 'full' ? `공간이 부족해요. 보낼 파일 ${this.mb(sent)}, 남은 공간 ${this.mb(total)}. 모두 비우기 후 다시 보내 주세요.` : `보내지 못했어요: ${name} (${msg || ''})`);
+    }
+    this.render();
+  },
+};
+
 window.__native = {
   onState(addr, state, name) {
     const d = dongles.get(addr); if (!d) return;
@@ -1459,6 +1525,7 @@ window.__native = {
   },
   onWriteFail(addr) { const d = dongles.get(addr); if (d) d.writeFail = true; },
   onVolumeKey(dir) { if (window.__clk) window.__clk.count(dir); },
+  onFileState(state, name, sent, total, idx, count, msg) { pcf.onState(state, name, sent, total, idx, count, msg); },
   onShare(j) { share.onState(j); },
   onShareItems(j) { try { share.add(JSON.parse(j)); } catch (e) {} },
   onUpdate(state, latest, cur, name, url) { upd.onResult(state, latest, cur, name, url); },
