@@ -1,0 +1,8 @@
+# HW 리모컨 동글 (8MB): 앱 2칸(무선 업데이트용) + PC로 보낼 파일 저장 공간
+# Name,   Type, SubType,  Offset,   Size
+nvs,      data, nvs,      0x9000,   0x5000,
+otadata,  data, ota,      0xe000,   0x2000,
+app0,     app,  ota_0,    0x10000,  0x1C0000,
+app1,     app,  ota_1,    0x1D0000, 0x1C0000,
+hwfiles,  data, 0x99,     0x390000, 0x460000,
+coredump, data, coredump, 0x7F0000, 0x10000,

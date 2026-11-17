@@ -19,6 +19,7 @@
 #include <Arduino.h>
 #include <Preferences.h>
 #include <Update.h>
+#include "HwFiles.h"
 
 #if ARDUINO_USB_MODE
 #error "도구(Tools) > USB Mode 를 'USB-OTG (TinyUSB)' 로 바꾼 뒤 다시 컴파일하세요."
@@ -54,6 +55,7 @@ static inline void stage(uint8_t s) { rtcStage = s; }
 String diag;        // 휴대폰 앱에 보여 줄 진단 문구
 // 무선 업데이트 상태
 bool otaOk = false;
+bool mscMode = false;   // PC 파일 드라이브로도 보일지
 uint32_t otaGot = 0, otaSize = 0;
 volatile bool otaDropped = false;   // 대기열이 꽉 차 펌웨어 조각을 못 받은 적이 있음
 String otaMsg = "";
@@ -64,7 +66,7 @@ static const int PIN_IR  = 4;   // 내장 IR LED
 static const int PIN_LED = 35;  // RGB LED (WS2812)
 static const int PIN_BTN = 41;  // 윗면 버튼
 
-static const char *FW_VERSION = "1.6.0";
+static const char *FW_VERSION = "1.7.0";
 
 // ---------------- BLE UUID ----------------
 #define SVC_UUID  "7e1a0001-5c2b-4f3a-9e7d-3c1b8a9f0a11"
@@ -96,6 +98,12 @@ enum : uint8_t {
   C_SET_NAME = 0x41, // [utf8...]
   C_BT_FORGET = 0x42, // 블루투스 키보드 연결 기록 지우기
   C_USB_COMPAT = 0x43, // [0=표준, 1=호환] 저장 후 다시 시작
+  C_MSC_MODE = 0x44,   // [0=끔, 1=켬] PC 파일 드라이브. 저장 후 다시 시작
+  // PC로 파일 보내기 (1.7.0부터)
+  C_FILE_BEGIN = 0x60, // [크기 u32][시각 u32][이름 utf8]
+  C_FILE_DATA = 0x61,  // [위치 u32][바이트...]
+  C_FILE_END = 0x62,
+  C_FILE_CLEAR = 0x63,
   // 무선 펌웨어 업데이트 (휴대폰 앱 → 블루투스)
   C_OTA_BEGIN = 0x50,  // [크기 u32 LE]
   C_OTA_DATA = 0x51,   // [바이트...]
@@ -205,7 +213,9 @@ void publishInfo() {
   String j = "{\"n\":\"" + devName + "\",\"v\":\"" + FW_VERSION + "\",\"usb\":" +
              (usbOn ? "true" : "false") + ",\"us\":" + String(usbSleep ? 1 : 0) + ",\"bt\":" + String(btHostCount()) +
              ",\"mtu\":" + String(peerMtu) + ",\"btn\":" + String(btnCount) +
-             ",\"uc\":" + String(usbCompat ? 1 : 0) + ",\"o\":\"" + otaMsg + "\",\"d\":\"" + diag + "\"}";
+             ",\"uc\":" + String(usbCompat ? 1 : 0) + ",\"o\":\"" + otaMsg + "\"" +
+             ",\"fm\":" + String(mscMode ? 1 : 0) + ",\"fs\":" + String(hwfiles::freeBytes()) + ",\"fc\":" + String(hwfiles::fileCount()) +
+             ",\"fr\":" + String(hwfiles::receiving()) + ",\"f\":\"" + hwfiles::state + "\",\"d\":\"" + diag + "\"}";
   infoChar->setValue(j.c_str());
   if (phoneConnected()) infoChar->notify();
 }
@@ -249,7 +259,7 @@ class CmdCB : public BLECharacteristicCallbacks {
     m.len = n;
     memcpy(m.d, v.c_str(), n);
     // 펌웨어 조각은 버리면 안 되므로 자리가 날 때까지 기다림 (휴대폰 쪽 전송 속도도 자연히 맞춰짐)
-    bool ota = m.d[0] == 0x51 || m.d[0] == 0x54;
+    bool ota = m.d[0] == 0x51 || m.d[0] == 0x54 || m.d[0] == 0x61;   // 파일 조각도 버리면 안 됨
     if (xQueueSend(cmdQueue, &m, ota ? pdMS_TO_TICKS(5000) : pdMS_TO_TICKS(20)) != pdTRUE && ota) otaDropped = true;   // 조용히 버리지 않고 표시
   }
 };
@@ -541,6 +551,20 @@ void handle(const Msg &m) {
       if (Update.isRunning()) Update.abort();
       otaOk = false; otaMsg = ""; infoDirty = true; ledBase();
       return;
+    case C_MSC_MODE:
+      prefs.putBool("msc", pn >= 1 && p[0] == 1);
+      delay(100);
+      ESP.restart();
+      break;
+    case C_FILE_BEGIN: hwfiles::cmdBegin(p, pn); infoDirty = true; return;
+    case C_FILE_DATA: {
+      hwfiles::cmdData(p, pn);
+      static uint32_t lastInfo = 0;
+      if (millis() - lastInfo > 400 || hwfiles::state.startsWith("err")) { lastInfo = millis(); infoDirty = true; }   // 진행률은 가끔만 알림
+      return;
+    }
+    case C_FILE_END: hwfiles::cmdEnd(); infoDirty = true; break;
+    case C_FILE_CLEAR: hwfiles::cmdClear(); infoDirty = true; break;
     case C_USB_COMPAT:
       prefs.putBool("usbcompat", pn >= 1 && p[0] == 1);
       delay(100);
@@ -629,6 +653,8 @@ void setup() {
   consumer->begin();
   sysctl->begin();
   absPtr->begin();
+  mscMode = prefs.getBool("msc", false);
+  hwfiles::begin(prefs, mscMode);   // PC 파일 드라이브 (USB.begin 전에)
   USB.begin();
 
   // BLE
@@ -696,6 +722,7 @@ void loop() {
   static uint32_t lastBtn = 0, lastPoll = 0;
   static bool btnPrev = HIGH;
 
+  hwfiles::loop();
   Msg m;
   while (xQueueReceive(cmdQueue, &m, 0) == pdTRUE) handle(m);
 

@@ -1,6 +1,6 @@
 {
- "version": "1.6.0",
- "size": 673552,
- "sha256": "7a03a4a2cbb7121694eabc439d93dfef61b5c626c7f151aa8c4f906fcb3a324e",
+ "version": "1.7.0",
+ "size": 680992,
+ "sha256": "ba7fda3e326c09f892b4be7ba8e41e2921783d8267c914764a729bca8c40b6b3",
  "url": "https://raw.githubusercontent.com/chaecj/field-remote/main/tv-remote/firmware/TVRemoteDongle.app.bin"
 }

@@ -39,7 +39,9 @@
 ## 동글 통신 (BLE)
 - 서비스 `7e1a0001-…`, 명령 쓰기 `7e1a0002-…`, 상태 알림 `7e1a0003-…` (JSON: n 이름, v 펌웨어, usb, bt, mtu, btn, uc USB 호환 모드, o OTA 상태, d 진단)
 - **쓰기 한 번은 512바이트까지** (ESP32 BLE 라이브러리가 BLE_ATT_ATTR_MAX_LEN=512 초과를 거절). MTU가 517이어도 앱은 `BLE_MAX_WRITE`(512)로 자른다
-- 명령 바이트: 0x01 키 누르기 [key, mods], 0x05 글자, 0x06 마우스 이동, 0x07 클릭, 0x0A 미디어키 [usage LE], 0x0E 화면 위치 마우스 [x u16, y u16 (0~32767), buttons] · 0x0F 그 위치 클릭 [x u16, y u16, (button)] (1.6.0부터, USB 보고서 번호 7), 0x20/0x30~0x32 IR, 0x40 동글 찾기, 0x41 이름, 0x42 블루투스 기록 삭제, 0x43 USB 호환 모드, 0x50~0x53 OTA (시작·조각·끝·중단), 0x54 위치를 붙인 OTA 조각 [offset u32 LE][bytes] (1.5.0부터, 앱은 동글 버전을 보고 고름)
+- 명령 바이트: 0x01 키 누르기 [key, mods], 0x05 글자, 0x06 마우스 이동, 0x07 클릭, 0x0A 미디어키 [usage LE], 0x0E 화면 위치 마우스 [x u16, y u16 (0~32767), buttons] · 0x0F 그 위치 클릭 [x u16, y u16, (button)] (1.6.0부터, USB 보고서 번호 7), 0x20/0x30~0x32 IR, 0x40 동글 찾기, 0x41 이름, 0x42 블루투스 기록 삭제, 0x43 USB 호환 모드, 0x44 PC 파일 모드 [0/1] (저장 후 재시작), 0x50~0x53 OTA (시작·조각·끝·중단), 0x54 위치를 붙인 OTA 조각 [offset u32 LE][bytes] (1.5.0부터, 앱은 동글 버전을 보고 고름)
+- **PC로 파일 보내기 (1.7.0부터, `HwFiles.h`)**: 0x60 시작 [size u32][현지시각 unix u32][이름 UTF-8 ≤90] · 0x61 조각 [offset u32][bytes] · 0x62 끝 · 0x63 모두 비우기. 파일은 `hwfiles` 파티션(0x390000, 4.375MB, `partitions.csv`)에 그대로 저장, PC에는 읽기 전용 FAT16 드라이브 "HW REMOTE"로 보임(PC 파일 모드일 때만 USB 저장장치를 켬). 최대 24개. 상태 JSON: fm 모드, fs 남은 바이트(-1 = 파티션 없음 → PC로 merged.bin 한 번 다시 굽기), fc 개수, fr 받은 바이트, f 상태(rx/ok/cleared/err:…). 앱 쪽은 `FileSender.java`가 파일을 직접 보냄
+- 파티션 표를 바꾸면 무선 업데이트로는 반영되지 않는다. PC로 `merged.bin`을 0x0에 다시 구워야 한다
 
 ## 작업 규칙
 - 화면 문구는 한국어, 짧고 쉽게. 앱 이름은 **HW 리모컨**, 동글 블루투스 이름은 `HW-xxxx`.
