@@ -40,6 +40,9 @@ public final class Bridge {
     @JavascriptInterface public void keepScreenOn(boolean on) { act.keepScreenOn(on); }
     // 화면 공유 (TV에 이미지·영상·PDF만 띄우기)
     @JavascriptInterface public void sharePick() { act.pickShareFiles(); }
+    // PC로 파일 보내기: 동글 주소와 남은 공간을 정해 두고 파일 고르기
+    @JavascriptInterface public void pcFilePick(String addr, long free) { FileSender.prepare(addr, free); act.pickPcFiles(); }
+    @JavascriptInterface public void pcFileCancel() { FileSender.cancel(); }
     @JavascriptInterface public void shareShow(String json) { onShare(s -> s.show(json)); }
     @JavascriptInterface public void shareBlack(boolean on) { onShare(s -> s.setBlack(on)); }
     @JavascriptInterface public void shareFill(boolean on) { onShare(s -> s.setFill(on)); }

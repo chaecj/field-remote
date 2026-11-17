@@ -54,6 +54,7 @@ public final class BleManager {
         Op inflight;   // 지금 보내는 중인 것 (실패 응답이 오면 다시 보냄)
         boolean unbondTried;   // 휴대폰에 남은 동글 등록 기록을 지워 봤는지
         int retries;
+        int mtu = 23;
         String name = "";
         Conn(String addr) { this.addr = addr; }
     }
@@ -165,6 +166,8 @@ public final class BleManager {
     void dumpStates() {
         for (Conn c : conns.values()) Hub.emit("onState", c.addr, c.ready ? "on" : c.gatt != null ? "wait" : "offline", c.name);
     }
+
+    int mtu(String addr) { Conn c = conns.get(addr); return c == null ? 23 : c.mtu; }
 
     int pending(String addr) {
         Conn c = conns.get(addr);
@@ -280,6 +283,7 @@ public final class BleManager {
         }
 
         @Override public void onMtuChanged(BluetoothGatt g, int mtu, int status) {
+            if (status == BluetoothGatt.GATT_SUCCESS) c.mtu = mtu;
             g.discoverServices();
         }
 

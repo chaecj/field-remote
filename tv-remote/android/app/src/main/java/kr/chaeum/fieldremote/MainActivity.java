@@ -24,7 +24,7 @@ import java.util.List;
 
 /** 화면: 리모컨 HTML을 띄우고, 블루투스 권한과 볼륨 버튼을 처리 */
 public class MainActivity extends Activity {
-    private static final int REQ_PERMS = 10, REQ_ENABLE_BT = 11, REQ_DISCOVERABLE = 12, REQ_SHARE_PICK = 13, REQ_CAMERA = 14;
+    private static final int REQ_PERMS = 10, REQ_ENABLE_BT = 11, REQ_DISCOVERABLE = 12, REQ_SHARE_PICK = 13, REQ_CAMERA = 14, REQ_FILE_PICK = 15;
 
     private WebView web;
     private final List<Runnable> afterBluetooth = new ArrayList<>();
@@ -171,6 +171,11 @@ public class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int code, int result, Intent data) {
         super.onActivityResult(code, result, data);
+        if (code == REQ_FILE_PICK) {
+            if (result == RESULT_OK && data != null) FileSender.onPicked(this, data);
+            else Hub.emit("onFileState", "cancel", "", 0, 0, 0, 0);
+            return;
+        }
         if (code == REQ_SHARE_PICK) {
             if (result == RESULT_OK && data != null && share != null) share.onPicked(data);
             return;
@@ -199,6 +204,17 @@ public class MainActivity extends Activity {
         runOnUiThread(() -> {
             if (userKeepOn || shareKeepOn) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        });
+    }
+
+    /** PC로 보낼 파일 고르기 (여러 개) */
+    void pickPcFiles() {
+        runOnUiThread(() -> {
+            Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            i.addCategory(Intent.CATEGORY_OPENABLE);
+            i.setType("*/*");
+            i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+            try { startActivityForResult(i, REQ_FILE_PICK); } catch (Exception ignored) {}
         });
     }
 
