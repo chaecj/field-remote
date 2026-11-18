@@ -179,6 +179,7 @@ details.more .grid { margin-top: 12px; }
 .vk small { font-size: 10.5px; color: var(--accent-2); font-weight: 600; }
 .vk.fn { background: var(--key); color: var(--muted); }
 .vk.fn b { font-size: 13px; }
+.vk.sm b { font-size: 12px; }
 .vk.on { background: var(--key-hi); color: var(--fg); box-shadow: inset 0 0 0 2px var(--accent); }
 .vk.lock { box-shadow: inset 0 0 0 2px var(--accent), 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
 .vk.han { background: var(--key-hi); color: var(--accent-2); }
@@ -1813,7 +1814,7 @@ function bindTouchpad() {
 // PC 키보드처럼 누른 키를 그대로 TV에 보냄. 한글·영어는 TV 입력기가 바꾸므로 '한/영' 키로 직접 전환
 // (각 키에 영어·한글을 같이 적어 두어, TV에 나오는 걸 보고 한/영만 누르면 됨)
 var vkb = {
-  layer: 'abc',            // abc 글자 · sym 기호 · fn 기능키
+  layer: 'abc',            // abc 글자 · fn 기능키·기호
   shift: 0,                // 0 끔 · 1 한 번 · 2 고정
   mods: 0,                 // Ctrl 1 · Alt 4 · Win 8 (한 번만 적용)
   lastShift: 0,
@@ -1821,33 +1822,25 @@ var vkb = {
   KO_SH: { q: 'ㅃ', w: 'ㅉ', e: 'ㄸ', r: 'ㄲ', t: 'ㅆ', o: 'ㅒ', p: 'ㅖ' },
   // 키 만들기: c = HID 키코드, m = 함께 누를 키, w = 너비, rep = 길게 누르면 반복
   letter(ch) { return { t: 'ch', ch, c: 0x04 + ch.charCodeAt(0) - 97 }; },
-  sym(ch) { const a = asciiKey(ch); return a ? { t: 'key', l: ch, c: a[0], m: a[1] } : null; },
   rows() {
     const L = (s) => [...s].map(ch => this.letter(ch));
     const BS = { t: 'key', l: '⌫', c: 0x2A, w: 1.5, rep: 1, cls: 'fn' };
-    // 맨 아랫줄: Ctrl·Alt를 먼저 누르고 다음 키를 누르면 함께 누른 것으로 보냄 (예: Ctrl → W = Ctrl+W)
+    // 맨 아랫줄: Ctrl·Win·Alt를 먼저 누르고 다음 키를 누르면 함께 누른 것으로 보냄 (예: Ctrl → W = Ctrl+W, Win → E)
     const bottom = [
-      { t: 'mod', l: 'Ctrl', v: 1, w: 1.2 }, { t: 'layer', l: 'Fn', v: 'fn', w: 1.1 },
+      { t: 'mod', l: 'Ctrl', v: 1, w: 1.2 }, { t: 'layer', l: 'Fn', v: 'fn', w: 1.1 }, { t: 'mod', l: 'Win', v: 8, w: 1.1 },
       { t: 'mod', l: 'Alt', v: 4, w: 1.1 }, { t: 'key', l: '띄어쓰기', c: 0x2C, w: 3 },
-      { t: 'layer', l: '!#', v: 'sym', w: 1.1 }, { t: 'han', l: '한/영', w: 1.5 }, { t: 'key', l: '↵', c: 0x28, w: 1.6, cls: 'ent' },
-    ];
-    if (this.layer === 'sym') return [
-      [...'!@#$%^&*()'].map(c => this.sym(c)),
-      [...'-_=+[]{}\\|'].map(c => this.sym(c)),
-      [...';:\'",./?'].map(c => this.sym(c)),
-      [...[...'`~<>'].map(c => this.sym(c)), BS],
-      bottom,
+      { t: 'han', l: '한/영', w: 1.5 }, { t: 'key', l: '↵', c: 0x28, w: 1.6, cls: 'ent' },
     ];
     if (this.layer === 'fn') {
       const K = (l, c, m = 0, x = {}) => ({ t: 'key', l, c, m, ...x });
       return [
         [...Array(10)].map((_, i) => K('F' + (i + 1), 0x3A + i, 0, { cls: 'fn' })),
-        [K('F11', 0x44, 0, { cls: 'fn' }), K('F12', 0x45, 0, { cls: 'fn' }), K('Esc', 0x29), K('Tab', 0x2B), K('Del', 0x4C, 0, { rep: 1 }),
-          K('Home', 0x4A), K('End', 0x4D), K('PgUp', 0x4B), K('PgDn', 0x4E)],
-        [{ t: 'mod', l: 'Win', v: 8 }, K('PrtSc', 0x46), { t: 'shift', l: '⇧' },
+        [K('F11', 0x44, 0, { cls: 'fn', w: 0.8 }), K('F12', 0x45, 0, { cls: 'fn', w: 0.8 }), K('Esc', 0x29), K('Tab', 0x2B), K('Del', 0x4C, 0, { rep: 1 }),
+          K('Home', 0x4A, 0, { cls: 'sm', w: 1.25 }), K('End', 0x4D), K('PgUp', 0x4B, 0, { cls: 'sm', w: 1.15 }), K('PgDn', 0x4E, 0, { cls: 'sm', w: 1.15 })],
+        [{ t: 'shift', l: '⇧', w: 1.5 }, K('PrtSc', 0x46, 0, { w: 1.3 }),
           K('←', 0x50, 0, { rep: 1 }), K('↑', 0x52, 0, { rep: 1 }), K('↓', 0x51, 0, { rep: 1 }), K('→', 0x4F, 0, { rep: 1 }), BS],
-        [K('복사', 0x06, 1, { sub: 'Ctrl+C' }), K('붙여넣기', 0x19, 1, { sub: 'Ctrl+V' }), K('되돌리기', 0x1D, 1, { sub: 'Ctrl+Z' }),
-          K('전체 선택', 0x04, 1, { sub: 'Ctrl+A' }), K('창 바꾸기', 0x2B, 4, { sub: 'Alt+Tab' }), K('창 닫기', 0x3D, 4, { sub: 'Alt+F4' })],
+        // 기호: PC 키보드처럼 그냥 누르면 위 글자, ⇧ 누르고 누르면 아래 글자 (! @ # 같은 건 숫자 키에 ⇧)
+        [...'`-=[]\\;\',./'].map((ch, i) => ({ t: 'key', l: ch, sl: '~_+{}|:"<>?'[i], c: asciiKey(ch)[0] })),
         bottom,
       ];
     }
