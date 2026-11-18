@@ -180,6 +180,10 @@ details.more .grid { margin-top: 12px; }
 .vk.fn { background: var(--key); color: var(--muted); }
 .vk.fn b { font-size: 13px; }
 .vk.sm b { font-size: 12px; }
+.vk.arr { background: var(--key-hi); }
+.vk.arr b { font-size: 20px; }
+/* 빈칸 (방향키 줄 맞춤: 빈칸 뒤 간격 하나를 빼서 위아래 줄의 ↑·↓가 딱 맞게) */
+.vkgap:not(:last-child) { margin-right: -5px; }
 .vk.on { background: var(--key-hi); color: var(--fg); box-shadow: inset 0 0 0 2px var(--accent); }
 .vk.lock { box-shadow: inset 0 0 0 2px var(--accent), 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
 .vk.han { background: var(--key-hi); color: var(--accent-2); }
@@ -1834,13 +1838,13 @@ var vkb = {
     if (this.layer === 'fn') {
       const K = (l, c, m = 0, x = {}) => ({ t: 'key', l, c, m, ...x });
       return [
-        [...Array(10)].map((_, i) => K('F' + (i + 1), 0x3A + i, 0, { cls: 'fn' })),
-        [K('F11', 0x44, 0, { cls: 'fn', w: 0.8 }), K('F12', 0x45, 0, { cls: 'fn', w: 0.8 }), K('Esc', 0x29), K('Tab', 0x2B), K('Del', 0x4C, 0, { rep: 1 }),
-          K('Home', 0x4A, 0, { cls: 'sm', w: 1.25 }), K('End', 0x4D), K('PgUp', 0x4B, 0, { cls: 'sm', w: 1.15 }), K('PgDn', 0x4E, 0, { cls: 'sm', w: 1.15 })],
-        [{ t: 'shift', l: '⇧', w: 1.5 }, K('PrtSc', 0x46, 0, { w: 1.3 }),
-          K('←', 0x50, 0, { rep: 1 }), K('↑', 0x52, 0, { rep: 1 }), K('↓', 0x51, 0, { rep: 1 }), K('→', 0x4F, 0, { rep: 1 }), BS],
+        // F1~F12 한 줄
+        [...Array(12)].map((_, i) => K('F' + (i + 1), 0x3A + i, 0, { cls: 'fn sm' })),
         // 기호: PC 키보드처럼 그냥 누르면 위 글자, ⇧ 누르고 누르면 아래 글자 (! @ # 같은 건 숫자 키에 ⇧)
-        [...'`-=[]\\;\',./'].map((ch, i) => ({ t: 'key', l: ch, sl: '~_+{}|:"<>?'[i], c: asciiKey(ch)[0] })),
+        [...[...'`-=[]\\;\',./'].map((ch, i) => ({ t: 'key', l: ch, sl: '~_+{}|:"<>?'[i], c: asciiKey(ch)[0] })), BS],
+        // 방향키: PC처럼 오른쪽 아래 ㅗ 모양, 크게 (길게 누르면 반복)
+        [K('Esc', 0x29, 0, { w: 1.5 }), K('Tab', 0x2B, 0, { w: 1.5 }), { t: 'gap', w: 3 }, K('↑', 0x52, 0, { rep: 1, w: 3, cls: 'arr' }), { t: 'gap', w: 3 }],
+        [{ t: 'shift', l: '⇧', w: 3 }, K('←', 0x50, 0, { rep: 1, w: 3, cls: 'arr' }), K('↓', 0x51, 0, { rep: 1, w: 3, cls: 'arr' }), K('→', 0x4F, 0, { rep: 1, w: 3, cls: 'arr' })],
         bottom,
       ];
     }
@@ -1856,6 +1860,7 @@ var vkb = {
     this.keys = [];
     // 접기 줄은 카메라 가로 화면에서 키보드가 위로 겹쳐 뜰 때만 보임 (원래 접기 버튼이 가려지므로)
     box.innerHTML = '<button class="vkclose" type="button">키보드 접기 ▾</button>' + this.rows().map(row => `<div class="vkr">${row.filter(Boolean).map(k => {
+      if (k.t === 'gap') return `<span class="vkgap" style="flex:${k.w} 1 0"></span>`;
       const i = this.keys.push(k) - 1, w = k.w || 1;
       let main = k.l, sub = '', cls = 'vk' + (k.cls ? ' ' + k.cls : '');
       if (k.t === 'ch') {
