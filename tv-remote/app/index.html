@@ -1828,8 +1828,8 @@ var vkb = {
     // 맨 아랫줄: Ctrl·Alt를 먼저 누르고 다음 키를 누르면 함께 누른 것으로 보냄 (예: Ctrl → W = Ctrl+W)
     const bottom = [
       { t: 'mod', l: 'Ctrl', v: 1, w: 1.2 }, { t: 'layer', l: 'Fn', v: 'fn', w: 1.1 },
-      { t: 'mod', l: 'Alt', v: 4, w: 1.1 }, { t: 'layer', l: '!#', v: 'sym', w: 1.1 },
-      { t: 'key', l: '띄어쓰기', c: 0x2C, w: 3 }, { t: 'han', l: '한/영', w: 1.5 }, { t: 'key', l: '↵', c: 0x28, w: 1.6, cls: 'ent' },
+      { t: 'mod', l: 'Alt', v: 4, w: 1.1 }, { t: 'key', l: '띄어쓰기', c: 0x2C, w: 3 },
+      { t: 'layer', l: '!#', v: 'sym', w: 1.1 }, { t: 'han', l: '한/영', w: 1.5 }, { t: 'key', l: '↵', c: 0x28, w: 1.6, cls: 'ent' },
     ];
     if (this.layer === 'sym') return [
       [...'!@#$%^&*()'].map(c => this.sym(c)),
