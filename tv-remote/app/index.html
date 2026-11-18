@@ -152,7 +152,6 @@ details.more .grid { margin-top: 12px; }
 
 /* 터치패드 */
 .pad-view { gap: 12px; }
-.typebar { display: flex; gap: 8px; align-items: stretch; }
 .pcfiles { display: grid; gap: 10px; }
 .pcfiles h2 { margin: 0; font-size: 16px; }
 .pcfiles p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.45; }
@@ -160,25 +159,36 @@ details.more .grid { margin-top: 12px; }
 .pcfiles .grow { flex: 1; }
 .pcfiles .pcbar { height: 6px; border-radius: 3px; background: var(--key); overflow: hidden; }
 .pcfiles .pcbar i { display: block; height: 100%; width: 0; background: var(--grad); }
-.fkwrap > summary {
-  list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
-  color: var(--muted); font: 600 12.5px var(--font-mono); user-select: none;
-}
-.fkwrap > summary::-webkit-details-marker { display: none; }
-.fkwrap > summary::after { content: "펼치기 ▾"; font-family: var(--font-ui); font-weight: 500; font-size: 12px; }
-.fkwrap[open] > summary::after { content: "접기 ▴"; }
-.fkwrap[open] > summary { color: var(--fg); border-color: var(--accent); }
-.fkeys { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 6px; }
-.fkeys .key { min-height: 38px; font-size: 12.5px; border-radius: 10px; font-family: var(--font-mono); }
-body.cam-on .fkwrap { display: none; }
-.typebar input { flex: 1; min-width: 0; height: 48px; font-size: 16px; }
-.typebar .btn { height: 48px; padding-inline: 16px; }
-.hanpill {
-  width: 48px; flex: none; border-radius: 12px; border: 1px solid var(--line); cursor: pointer;
-  background: linear-gradient(180deg, var(--key-hi), var(--key)); font-weight: 800; font-size: 17px; color: var(--accent-2);
-}
-.hanpill.ko { color: var(--accent-ink); background: var(--grad); border-color: transparent; }
+/* 키보드 펼치기 버튼 + 가상 키보드 */
+.kbtoggle { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 14px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--panel); color: var(--muted); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.kbtoggle span { display: inline-flex; align-items: center; gap: 8px; }
+.kbtoggle svg { width: 20px; height: 20px; }
+.kbtoggle::after { content: "펼치기 ▾"; font-weight: 500; font-size: 12px; }
+.kbtoggle[aria-expanded="true"] { color: var(--fg); border-color: var(--accent); }
+.kbtoggle[aria-expanded="true"]::after { content: "접기 ▴"; }
+.vkb { display: none; flex-direction: column; gap: 6px; padding: 8px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line);
+  user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+.pad-view.kb-on .vkb { display: flex; }
+.vkr { display: flex; gap: 5px; }
+.vkclose { display: none; align-self: flex-end; border: 0; background: none; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 600; padding: 2px 6px; cursor: pointer; }
+.vk { --h: 44px; height: var(--h); min-width: 0; padding: 0; border: 1px solid transparent; border-radius: 9px; cursor: pointer; position: relative;
+  background: linear-gradient(180deg, var(--key-hi), var(--key)); color: var(--fg); box-shadow: 0 1px 1px rgb(0 0 0 / 0.35);
+  display: grid; place-items: center; align-content: center; gap: 0; line-height: 1.05; font: inherit; }
+.vk b { font-size: 15px; font-weight: 600; }
+.vk small { font-size: 10.5px; color: var(--accent-2); font-weight: 600; }
+.vk.fn { background: var(--key); color: var(--muted); }
+.vk.fn b { font-size: 13px; }
+.vk.on { background: var(--key-hi); color: var(--fg); box-shadow: inset 0 0 0 2px var(--accent); }
+.vk.lock { box-shadow: inset 0 0 0 2px var(--accent), 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
+.vk.han { background: var(--key-hi); color: var(--accent-2); }
+.vk.han b { font-size: 13.5px; }
+.vk.ent { background: var(--grad); color: var(--accent-ink); }
+.vk.ent b { font-size: 18px; }
+.vk.pressed, .vk:active { filter: brightness(1.25); transform: translateY(1px); }
+/* 키보드를 펼치면 터치패드·카메라 칸을 줄여 한 화면에 가깝게 */
+.pad-view.kb-on .touchpad { height: max(150px, calc(100dvh - 650px)); }
+.pad-view.kb-on .cambox { height: max(240px, calc(100dvh - 560px)); }
 /* 카메라로 보며 터치 */
 .cambox { display: flex; flex-direction: column; gap: 10px; height: calc(100dvh - 300px - env(safe-area-inset-bottom, 0px)); min-height: 320px; }
 .cambox[hidden] { display: none; }
@@ -358,8 +368,9 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
   #v-remote .log { grid-column: 1 / -1; }
 
   /* 터치패드: 왼쪽 = 글자 입력, 오른쪽 = 패드 */
-  .pad-view > .typebar, .pad-view > #padMode, .pad-view > .fkwrap { grid-column: 1; }
-  .pad-view > .padbox, .pad-view > .cambox { grid-row: 1 / span 3; }
+  .pad-view > #padMode, .pad-view > #kbToggle, .pad-view > .vkb { grid-column: 1; }
+  .pad-view > .padbox, .pad-view > .cambox { grid-row: 1 / span 4; }
+  .pad-view.kb-on .touchpad { height: calc(100vh - 260px); }
   .cambox { height: calc(100dvh - 150px); }
   /* 태블릿 가로 + 카메라 터치: 왼쪽 큰 사진, 오른쪽 조작 칸 */
   body.cam-on #v-pad { grid-template-columns: 1fr 260px; align-items: start; }
@@ -367,7 +378,7 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
   body.cam-on #camBox { display: contents; }
   body.cam-on #camStage { grid-column: 1; grid-row: 1 / span 4; height: calc(100dvh - 210px - env(safe-area-inset-bottom, 0px)); }
   body.cam-on #padMode { grid-row: 1; }
-  body.cam-on #v-pad > .typebar { grid-row: 2; }
+  body.cam-on #kbToggle { grid-row: 2; }
   body.cam-on #camShot { grid-row: 3; min-height: 72px; }
   body.cam-on #camFwNote { grid-row: 4; }
   .pad-view .touchpad { height: calc(100vh - 260px); max-height: none; min-height: 200px; }
@@ -412,13 +423,28 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
   body.cam-on #camStage { grid-column: 1; grid-row: 1 / span 4; height: calc(100dvh - 92px - env(safe-area-inset-bottom, 0px)); }
   body.cam-on #padMode { grid-row: 1; }
   body.cam-on #padMode button { padding: 7px 2px; font-size: 12px; }
-  body.cam-on #v-pad > .typebar { grid-row: 2; gap: 6px; }
-  body.cam-on .typebar input { height: 42px; font-size: 14px; }
-  body.cam-on .typebar .btn, body.cam-on .hanpill { height: 42px; padding-inline: 8px; }
-  body.cam-on .hanpill { width: 38px; }
+  body.cam-on #kbToggle { grid-row: 2; padding: 8px 10px; }
   body.cam-on #camShot { grid-row: 3; min-height: 64px; }
   body.cam-on #camFwNote { grid-row: 4; font-size: 11.5px; }
 }
+/* 카메라 터치 가로 화면: 키보드는 화면 아래에 겹쳐 띄움 (사진을 크게 쓰도록) */
+@media (orientation: landscape) and (min-width: 700px) {
+  body.cam-on .pad-view.kb-on .vkb { position: fixed; left: 8px; right: 8px; bottom: calc(66px + env(safe-area-inset-bottom, 0px)); z-index: 8;
+    box-shadow: 0 8px 30px rgb(0 0 0 / 0.5); }
+  body.cam-on .vk { --h: 38px; }
+  body.cam-on .vkclose { display: block; }
+}
+/* 태블릿 가로(터치패드): 키보드를 늘 펼쳐 두고 세로 스크롤 없이 */
+@media (orientation: landscape) and (min-width: 700px) and (min-height: 560px) {
+  body:not(.cam-on) .pad-view .vkb { display: flex; }
+  body:not(.cam-on) #kbToggle { display: none; }
+  body:not(.cam-on) .pad-view .touchpad { height: calc(100vh - 260px); }
+  .vk { --h: clamp(48px, calc((100vh - 330px) / 5.6), 72px); }
+  .vk b { font-size: 17px; }
+  .vk small { font-size: 12px; }
+}
+/* 휴대폰 가로: 키를 조금 낮게 */
+@media (orientation: landscape) and (max-height: 500px) { .vk { --h: 38px; } .vk b { font-size: 14px; } .vk small { font-size: 9.5px; } }
 /* 키가 작은 휴대폰(세로): 간격과 버튼 높이를 조금 줄여 숫자 패드까지 한 화면에 */
 @media (orientation: portrait) and (max-height: 820px) {
   header.top { padding-block: 8px 6px; gap: 8px; }
@@ -504,29 +530,7 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
       <button data-pm="pad" aria-pressed="true">터치패드</button>
       <button data-pm="cam" aria-pressed="false">카메라 터치</button>
     </div>
-    <!-- 글자 입력: 위쪽에 두어 휴대폰 키보드가 올라와도 가리지 않음 -->
-    <div class="typebar">
-      <input type="text" id="textIn" placeholder="여기에 치면 TV에 바로 입력" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="TV에 입력할 글자">
-      <button class="hanpill" id="hanBtn" title="한글이 영어로(또는 반대로) 나오면 누르세요">A</button>
-      <button class="btn primary" id="textSend">엔터</button>
-    </div>
-    <details class="fkwrap" id="fkWrap">
-      <summary>F1 ~ F12</summary>
-  <div class="fkeys" aria-label="F1~F12">
-        <button class="key" data-kb="58">F1</button>
-        <button class="key" data-kb="59">F2</button>
-        <button class="key" data-kb="60">F3</button>
-        <button class="key" data-kb="61">F4</button>
-        <button class="key" data-kb="62">F5</button>
-        <button class="key" data-kb="63">F6</button>
-        <button class="key" data-kb="64">F7</button>
-        <button class="key" data-kb="65">F8</button>
-        <button class="key" data-kb="66">F9</button>
-        <button class="key" data-kb="67">F10</button>
-        <button class="key" data-kb="68">F11</button>
-        <button class="key" data-kb="69">F12</button>
-      </div>
-    </details>
+    <button class="kbtoggle" id="kbToggle" aria-expanded="true" aria-controls="vkb"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6"/></svg>키보드</span></button>
 
     <!-- 터치패드: 노트북 트랙패드처럼 아래에 클릭 버튼이 붙어 있음 -->
     <div class="padbox" id="padBox">
@@ -557,6 +561,9 @@ nav.tabs button[aria-selected="true"] { color: var(--accent); font-weight: 700; 
       <p class="hint" id="camFwNote" hidden>지금 동글은 커서를 옮겨서 대략 클릭해요. 펌웨어를 1.6.0으로 올리면 누른 곳을 정확히 클릭해요.</p>
       <button class="shutter" id="camShot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l1.6-2.4h6.8L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.6"/></svg><span id="camShotTxt">찍기</span></button>
     </div>
+
+    <!-- 가상 키보드: PC 키보드처럼 누른 키를 그대로 TV에 (영어·한글 같이 표시, 한/영 키로 전환) -->
+    <div class="vkb" id="vkb" aria-label="키보드"></div>
   </section>
 
   <!-- 클리커 -->
@@ -1782,40 +1789,6 @@ function bindTouchpad() {
     e.currentTarget.textContent = dragging ? '끌기 해제' : '끌기 고정';
     sendRaw(d => d.write([dragging ? OP.MDOWN : OP.MUP, 1]));
   };
-  const sendText = () => {
-    const t = $('#textIn').value;
-    if (!t) return;
-    const segs = splitHangul(t);
-    if (!segs) { ui.toast('한글·영문·숫자·기호만 보낼 수 있어요.'); return; }
-    sendRaw(d => {
-      let han = !!(store.hanState || {})[d.id];
-      for (const s of segs) {
-        if (s.han !== null && s.han !== han) { sendToggle(d); han = s.han; }
-        if (s.han) for (const [k, m] of s.keys) d.write([OP.KEY_TAP, k, m], true);
-        else { const max = d.payloadMax - 1; for (let i = 0; i < s.text.length; i += max) d.write([OP.TEXT, ...enc.encode(s.text.slice(i, i + max))], true); }
-      }
-      setHan(d, han);
-    });
-    ui.toast(`${t.length}글자를 보냈어요`); $('#textIn').value = '';
-  };
-  // 한/영 전환
-  const renderHan = () => {
-    const d = dongles.get(current); const han = d ? !!(store.hanState || {})[d.id] : false;
-    const b = $('#hanBtn'); b.textContent = han ? '가' : 'A'; b.classList.toggle('ko', han);
-    b.setAttribute('aria-label', `한/영 맞추기 (앱은 TV가 지금 ${han ? '한글' : '영어'} 상태라고 봄)`);
-  };
-  const setHan = (d, v) => { store.hanState = store.hanState || {}; store.hanState[d.id] = v; save(); renderHan(); };
-  // 한/영이 반대로 나올 때: 앱이 알고 있는 TV 상태만 뒤집음 (TV에는 아무것도 보내지 않음)
-  const flipHan = () => {
-    const d = dongles.get(current); if (!d) return;
-    const now = !(store.hanState || {})[d.id];
-    setHan(d, now);
-    $('#textIn').value = ''; prev = '';
-    ui.toast(`맞췄어요. TV가 지금 ${now ? '한글' : '영어'} 상태라고 보고 입력해요. 다시 쳐 주세요.`);
-    $('#textIn').focus();
-  };
-  // 한/영 전환은 치는 글자에 맞춰 자동. 가/A 버튼은 결과가 반대로 나올 때 맞추는 용도
-  $('#hanBtn').onclick = flipHan;
   window.openHanSettings = () => {
     const d0 = dongles.get(current); if (!d0) { ui.toast('TV를 먼저 선택해 주세요.'); return; }
     const sel = hanKeyOf(d0.id);
@@ -1834,60 +1807,116 @@ function bindTouchpad() {
       $$('[data-hu]', s).forEach(b => b.onclick = () => { cfgOf(d0.id).hanKey = +b.dataset.hu; save(); close(); ui.render(); ui.toast(`${ui.name(d0)} 한/영 전환: ${HAN_KEYS[+b.dataset.hu][0]}`); });
     });
   };
-  $$('nav.tabs [data-tab="pad"]').forEach(b => b.addEventListener('click', renderHan));
-  renderHan();
-  // ---- 실시간 입력: 휴대폰에서 치는 대로 바로 TV에 입력 ----
-  const live = true; let prev = '';
-  const syncLive = () => {
-    $('#textSend').textContent = '엔터';
-    $('#textIn').placeholder = '여기에 치면 TV에 바로 입력';
-  };
-  const BS = 0x2A;
-  // 한 글자 → [{k,m,han}] (han: true=한글 모드, false=영어 모드, null=상관없음)
-  const charKeys = (ch) => {
-    const hk = hangulKeys(ch);
-    if (hk) return hk.map(([k, m]) => ({ k, m, han: true }));
-    const a = asciiKey(ch);
-    if (a) return [{ k: a[0], m: a[1], han: /[A-Za-z]/.test(ch) ? false : null }];
-    return null;
-  };
-  const strKeys = (s) => { const out = []; for (const ch of s) { const k = charKeys(ch); if (!k) return null; out.push(...k); } return out; };
-  const typeKeys = (d, list) => {
-    let han = !!(store.hanState || {})[d.id];
-    for (const x of list) {
-      if (x.han !== null && x.han !== han) { sendToggle(d); han = x.han; }
-      d.write([OP.KEY_TAP, x.k, x.m], true);
+}
+
+/* ---------------- 가상 키보드 (터치패드 탭) ---------------- */
+// PC 키보드처럼 누른 키를 그대로 TV에 보냄. 한글·영어는 TV 입력기가 바꾸므로 '한/영' 키로 직접 전환
+// (각 키에 영어·한글을 같이 적어 두어, TV에 나오는 걸 보고 한/영만 누르면 됨)
+var vkb = {
+  layer: 'abc',            // abc 글자 · sym 기호 · fn 기능키
+  shift: 0,                // 0 끔 · 1 한 번 · 2 고정
+  mods: 0,                 // Ctrl 1 · Alt 4 · Win 8 (한 번만 적용)
+  lastShift: 0,
+  KO: { q: 'ㅂ', w: 'ㅈ', e: 'ㄷ', r: 'ㄱ', t: 'ㅅ', y: 'ㅛ', u: 'ㅕ', i: 'ㅑ', o: 'ㅐ', p: 'ㅔ', a: 'ㅁ', s: 'ㄴ', d: 'ㅇ', f: 'ㄹ', g: 'ㅎ', h: 'ㅗ', j: 'ㅓ', k: 'ㅏ', l: 'ㅣ', z: 'ㅋ', x: 'ㅌ', c: 'ㅊ', v: 'ㅍ', b: 'ㅠ', n: 'ㅜ', m: 'ㅡ' },
+  KO_SH: { q: 'ㅃ', w: 'ㅉ', e: 'ㄸ', r: 'ㄲ', t: 'ㅆ', o: 'ㅒ', p: 'ㅖ' },
+  // 키 만들기: c = HID 키코드, m = 함께 누를 키, w = 너비, rep = 길게 누르면 반복
+  letter(ch) { return { t: 'ch', ch, c: 0x04 + ch.charCodeAt(0) - 97 }; },
+  sym(ch) { const a = asciiKey(ch); return a ? { t: 'key', l: ch, c: a[0], m: a[1] } : null; },
+  rows() {
+    const L = (s) => [...s].map(ch => this.letter(ch));
+    const BS = { t: 'key', l: '⌫', c: 0x2A, w: 1.5, rep: 1, cls: 'fn' };
+    const bottom = [
+      { t: 'layer', l: 'Fn', v: 'fn', w: 1.2 }, { t: 'layer', l: '!#', v: 'sym', w: 1.2 },
+      { t: 'han', l: '한/영', w: 1.6 }, { t: 'key', l: '띄어쓰기', c: 0x2C, w: 4 }, { t: 'key', l: '↵', c: 0x28, w: 1.8, cls: 'ent' },
+    ];
+    if (this.layer === 'sym') return [
+      [...'!@#$%^&*()'].map(c => this.sym(c)),
+      [...'-_=+[]{}\\|'].map(c => this.sym(c)),
+      [...';:\'",./?'].map(c => this.sym(c)),
+      [...[...'`~<>'].map(c => this.sym(c)), BS],
+      bottom,
+    ];
+    if (this.layer === 'fn') {
+      const K = (l, c, m = 0, x = {}) => ({ t: 'key', l, c, m, ...x });
+      return [
+        [...Array(10)].map((_, i) => K('F' + (i + 1), 0x3A + i, 0, { cls: 'fn' })),
+        [K('F11', 0x44, 0, { cls: 'fn' }), K('F12', 0x45, 0, { cls: 'fn' }), K('Esc', 0x29), K('Tab', 0x2B), K('Del', 0x4C, 0, { rep: 1 }),
+          K('Home', 0x4A), K('End', 0x4D), K('PgUp', 0x4B), K('PgDn', 0x4E)],
+        [{ t: 'mod', l: 'Ctrl', v: 1 }, { t: 'mod', l: 'Alt', v: 4 }, { t: 'mod', l: 'Win', v: 8 },
+          K('←', 0x50, 0, { rep: 1 }), K('↑', 0x52, 0, { rep: 1 }), K('↓', 0x51, 0, { rep: 1 }), K('→', 0x4F, 0, { rep: 1 }), BS],
+        [K('복사', 0x06, 1, { sub: 'Ctrl+C' }), K('붙여넣기', 0x19, 1, { sub: 'Ctrl+V' }), K('되돌리기', 0x1D, 1, { sub: 'Ctrl+Z' }),
+          K('전체 선택', 0x04, 1, { sub: 'Ctrl+A' }), K('창 바꾸기', 0x2B, 4, { sub: 'Alt+Tab' }), K('창 닫기', 0x3D, 4, { sub: 'Alt+F4' })],
+        bottom,
+      ];
     }
-    store.hanState = store.hanState || {}; store.hanState[d.id] = han; save();
-  };
-  const liveSend = () => {
-    const now = $('#textIn').value;
-    if (now === prev) return;
-    let p = 0; const a = [...prev], b = [...now];
-    while (p < a.length && p < b.length && a[p] === b[p]) p++;
-    const oldTail = a.slice(p).join(''), newTail = b.slice(p).join('');
-    const kOld = strKeys(oldTail) || [], kNew = strKeys(newTail);
-    if (!kNew) { ui.toast('보낼 수 없는 글자가 있어요'); $('#textIn').value = prev; return; }
-    const isPrefix = (x, y) => x.length <= y.length && x.every((v, i) => v.k === y[i].k && v.m === y[i].m);
-    sendRaw(d => {
-      if (isPrefix(kOld, kNew)) typeKeys(d, kNew.slice(kOld.length));                       // 이어서 치기 (한글 조합 포함)
-      else if (isPrefix(kNew, kOld) && [...oldTail].length === [...newTail].length) {         // 조합 중인 글자에서 자모 지우기
-        for (let i = 0; i < kOld.length - kNew.length; i++) d.write([OP.KEY_TAP, BS, 0], true);
-      } else {                                                                              // 글자 지우기·바꾸기
-        for (let i = 0; i < [...oldTail].length; i++) d.write([OP.KEY_TAP, BS, 0], true);
-        typeKeys(d, kNew);
-      }
-    });
-    prev = now; renderHan();
-  };
-  $('#textIn').addEventListener('input', () => { if (live) liveSend(); });
-  $('#textIn').addEventListener('keydown', (e) => {
-    if (live && (e.key === 'Backspace' || e.keyCode === 8) && $('#textIn').value === '') { sendRaw(d => d.write([OP.KEY_TAP, BS, 0], true)); }
-    if (e.key === 'Enter') { e.preventDefault(); live ? liveEnter() : sendText(); }
+    return [
+      [...'1234567890'].map((d, i) => ({ t: 'key', l: d, sl: '!@#$%^&*()'[i], c: d === '0' ? 0x27 : 0x1E + i })),
+      L('qwertyuiop'), L('asdfghjkl'),
+      [{ t: 'shift', l: '⇧', w: 1.5 }, ...L('zxcvbnm'), BS],
+      bottom,
+    ];
+  },
+  render() {
+    const box = $('#vkb'); if (!box) return;
+    this.keys = [];
+    // 접기 줄은 카메라 가로 화면에서 키보드가 위로 겹쳐 뜰 때만 보임 (원래 접기 버튼이 가려지므로)
+    box.innerHTML = '<button class="vkclose" type="button">키보드 접기 ▾</button>' + this.rows().map(row => `<div class="vkr">${row.filter(Boolean).map(k => {
+      const i = this.keys.push(k) - 1, w = k.w || 1;
+      let main = k.l, sub = '', cls = 'vk' + (k.cls ? ' ' + k.cls : '');
+      if (k.t === 'ch') {
+        const up = this.shift > 0;
+        main = up ? k.ch.toUpperCase() : k.ch;
+        sub = (up && this.KO_SH[k.ch]) || this.KO[k.ch];
+      } else if (k.t === 'key' && k.sl) { main = this.shift ? k.sl : k.l; sub = this.shift ? k.l : k.sl; }
+      else if (k.sub) sub = k.sub;
+      if (k.t === 'shift') { cls += ' fn' + (this.shift ? ' on' : '') + (this.shift === 2 ? ' lock' : ''); }
+      if (k.t === 'layer') cls += ' fn' + (this.layer === k.v ? ' on' : '');
+      if (k.t === 'mod') cls += ' fn' + (this.mods & k.v ? ' on' : '');
+      if (k.t === 'han') cls += ' han';
+      return `<button class="${cls}" data-i="${i}" style="flex:${w} 1 0"><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</button>`;
+    }).join('')}</div>`).join('');
+  },
+  press(k) {
+    if (navigator.vibrate) navigator.vibrate(6);
+    if (k.t === 'layer') { this.layer = this.layer === k.v ? 'abc' : k.v; this.render(); return; }
+    if (k.t === 'shift') {
+      const now = Date.now();
+      this.shift = this.shift === 0 ? (now - this.lastShift < 350 ? 2 : 1) : (this.shift === 1 && now - this.lastShift < 350 ? 2 : 0);
+      this.lastShift = now; this.render(); return;
+    }
+    if (k.t === 'mod') { this.mods ^= k.v; this.render(); return; }
+    if (k.t === 'han') { sendRaw(d => sendToggle(d)); return; }
+    // 글자·기능키: Shift·Ctrl·Alt·Win을 함께 눌러 보냄
+    let m = (k.m || 0) | this.mods;
+    if (this.shift && (k.t === 'ch' || k.sl || k.c >= 0x3A || k.rep)) m |= 2;
+    sendRaw(d => d.write([OP.KEY_TAP, k.c, m], true));
+    if (this.shift === 1 || this.mods) { if (this.shift === 1) this.shift = 0; this.mods = 0; this.render(); }
+  },
+};
+function bindKeyboard() {
+  const box = $('#vkb');
+  let t1 = 0, t2 = 0, held = null;
+  const stop = () => { clearTimeout(t1); clearInterval(t2); if (held) held.classList.remove('pressed'); held = null; };
+  box.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('.vkclose')) { e.preventDefault(); store.kbOpen = false; save(); syncKb(); return; }
+    const b = e.target.closest('.vk'); if (!b) return;
+    e.preventDefault(); stop();
+    const k = vkb.keys[+b.dataset.i]; if (!k) return;
+    held = b; b.classList.add('pressed');
+    vkb.press(k);
+    if (k.rep) t1 = setTimeout(() => { t2 = setInterval(() => { if (targets().every(d => d.pending < 3)) vkb.press(k); }, 90); }, 420);
   });
-  const liveEnter = () => { liveSend(); sendRaw(d => d.write([OP.KEY_TAP, 0x28, 0], true)); $('#textIn').value = ''; prev = ''; };
-  $('#textSend').onclick = () => live ? liveEnter() : sendText();
-  syncLive();
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => box.addEventListener(ev, stop));
+  box.addEventListener('contextmenu', e => e.preventDefault());
+  $('#kbToggle').onclick = () => { store.kbOpen = !kbOpen(); save(); syncKb(); };
+  vkb.render(); syncKb();
+}
+const kbOpen = () => store.kbOpen !== false;   // 처음엔 펼쳐 둠
+function syncKb() {
+  const on = kbOpen();
+  $('#v-pad').classList.toggle('kb-on', on);
+  $('#kbToggle').setAttribute('aria-expanded', on);
+  if (typeof cam !== 'undefined' && !$('#camBox').hidden) requestAnimationFrame(() => cam.layout());
 }
 
 /* ---------------- 화면 공유 ---------------- */
@@ -2552,7 +2581,7 @@ function init() {
     setTimeout(() => upd.check(false), 1500);   // 켤 때마다 조용히 확인
   }
   $('#wakeBtn').onclick = (e) => toggleWake(e.currentTarget);
-  bindKeys(); bindTouchpad(); bindCamera(); bindShare(); bindClicker();
+  bindKeys(); bindTouchpad(); bindKeyboard(); bindCamera(); bindShare(); bindClicker();
   document.addEventListener('visibilitychange', () => {
     if (!NATIVE && document.visibilityState === 'visible' && $('#wakeBtn').getAttribute('aria-pressed') === 'true' && !wakeLock) toggleWake($('#wakeBtn'));
   });
