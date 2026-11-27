@@ -774,7 +774,9 @@ const ACTIONS = {
   input: { label: '외부입력' }, hdmi: { label: 'HDMI' },
   home: { label: '홈', hid: cc(0x223) }, menu: { label: '설정', hid: cc(0x40) },
   qmenu: { label: '빠른 설정' }, tools: { label: '도구' },
-  back: { label: '뒤로', hid: kb(0x29) }, exit: { label: '나가기', hid: kb(0x29) }, info: { label: '정보' },
+  // 뒤로: 미디어 '뒤로'(AC Back) — 홈(AC Home)이 먹는 TV는 이것도 먹음. Esc는 TV 대부분이 무시함
+  // 나가기: USB엔 '나가기' 키가 없어 '뒤로'를 3번 (열린 메뉴를 한꺼번에 닫음). 브랜드 IR이 있으면 IR '나가기'
+  back: { label: '뒤로', hid: cc(0x224) }, exit: { label: '나가기', hid: { t: 'cc', u: 0x224, n: 3 } }, info: { label: '정보' },
   up: { label: '위', hid: kb(0x52) }, down: { label: '아래', hid: kb(0x51) },
   left: { label: '왼쪽', hid: kb(0x50) }, right: { label: '오른쪽', hid: kb(0x4F) }, ok: { label: '확인', hid: kb(0x28) },
   volup: { label: '음량 +', hid: cc(0xE9) }, voldown: { label: '음량 −', hid: cc(0xEA) }, mute: { label: '음소거', hid: cc(0xE2) },
@@ -785,7 +787,7 @@ const ACTIONS = {
 };
 for (let i = 0; i < 10; i++) ACTIONS['d' + i] = { label: String(i), hid: kb(i === 0 ? 0x27 : 0x1D + i) };
 // 브랜드 IR이 있으면 IR을 먼저 쓰는 버튼 (USB로는 TV마다 반응이 제각각인 것들)
-const IR_FIRST = new Set(['power', 'on', 'off', 'input', 'hdmi', 'menu', 'home', 'info', 'exit', 'qmenu', 'tools']);
+const IR_FIRST = new Set(['power', 'on', 'off', 'input', 'hdmi', 'menu', 'home', 'info', 'back', 'exit', 'qmenu', 'tools']);
 
 const HID_CHOICES = [
   ['Enter', kb(0x28)], ['Esc', kb(0x29)], ['Backspace', kb(0x2A)], ['Tab', kb(0x2B)], ['Space', kb(0x2C)],
@@ -995,7 +997,7 @@ function packetsFor(d, m, peek) {
   if (!m) return [];
   if (m.type === 'hid') {
     if (m.t === 'kb') return [{ b: [OP.KEY_TAP, m.k, m.mods || 0], r: false }];
-    if (m.t === 'cc') return [{ b: [OP.CC_TAP, m.u & 0xFF, m.u >> 8], r: false }];
+    if (m.t === 'cc') return Array.from({ length: m.n || 1 }, () => ({ b: [OP.CC_TAP, m.u & 0xFF, m.u >> 8], r: !!m.n }));
     if (m.t === 'sys') return [{ b: [OP.SYS, m.c], r: false }];
   }
   if (m.type === 'ir' || m.type === 'pronto') return irPackets(d, irFrame(d, m, peek));
